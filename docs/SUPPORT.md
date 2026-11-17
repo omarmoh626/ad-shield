@@ -147,3 +147,15 @@ These behaviors differ from Windows PowerShell on purpose.
 - **One transaction per input.** The console works on its own copy of the simulated domain while an input runs. The lab receives the new domain state only when the run finishes. An input with a syntax error, an unknown command, or an unknown parameter name returns the domain unchanged.
 - **Type conversion.** The binder converts between text, whole numbers, and Boolean values. `true` and `false` in any letter case convert to a Boolean value. It does not convert dates or other .NET types.
 - **Parameter sets.** The console picks the first parameter set that fits the named and positional arguments, starting with the default set. It does not prompt for a missing mandatory parameter. It reports an error instead.
+- **`Reset-SimAttempt`.** The cmdlet restores the case checkpoint with the same ticket-engine reset that the GUI uses. It is not a directory action, so it writes no audit event. The console returns the restored domain state, and the attempt's action log starts empty again.
+- **Case 01 setup.** The lockout is produced by five simulated bad-password sign-ins at the user's workstation, through the normal sign-in handler. The simulated lockout threshold is 5. The near-match coworker is created through the action pipeline when the case is introduced, so that account's creation event comes before the case checkpoint.
+- **Password reset and lockout.** A simulated password reset does not unlock the account, as in Windows Server. An unlock is a separate action (event 4767).
+
+## Saving
+
+- The simulator saves to one browser storage key, `adshield.v1`. The save holds the campaign progress, the base and case seeds, the lab clock, and the committed actions since each case checkpoint. It holds no directory state and no password values. Loading rebuilds the directory from the seeds and replays the actions.
+- If the save cannot be read, the simulator keeps a copy under `adshield.v1.backup`, shows a notice, and starts a new campaign. If the save comes from a newer version, the tab shows a notice and does not write, so the save stays as it is.
+- Only one tab saves at a time. The first tab takes a browser Web Lock named `adshield-writer` and keeps it while it stays open. Any other tab opens read-only and says so. When the saving tab closes, the next tab loads the newest save and starts saving.
+- Each save also checks the save's revision number. A tab never writes over a save that is newer than the one it last loaded or wrote. If that happens, the tab becomes read-only and says so.
+- **Simplified:** in a browser without Web Locks (`navigator.locks`), the simulator shows a notice and relies on the revision check alone. Two tabs that save at almost the same moment could then both write, and the later save would win. Keep the simulator open in one tab only in that browser.
+- When storage is full or blocked, the simulator shows a notice and keeps working. It shows "Not saved" until a later save succeeds.

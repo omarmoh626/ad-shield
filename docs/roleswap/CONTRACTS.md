@@ -241,9 +241,11 @@ interface CampaignState {
   history: Attempt[];
 }
 
-function runScriptRoute(fixture: CaseFixture, steps?: ScriptStep[], base?: DomainState, seed?: number): RouteResult;
+// src/tickets/routes.ts (D4: moved out of engine.ts so the runtime -> engine import has no cycle)
+function runScriptRoute(fixture: CaseFixture, steps?: ScriptStep[], base?: DomainState, seed?: number, input?: { readSecure?; confirm? }): RouteResult;
 function runGuiRoute(fixture: CaseFixture, base?: DomainState, seed?: number): RouteResult;
 // Helpers use fixture.ticketId and ids.operator; each returns closed plus live predicates.
+// runGuiRoute dispatches with source 'gui' and baseRevision set to the attempt's current revision.
 
 // D1 adds read-screen and transfer content; it does not rename existing contract fields.
 // PredicateResult remains { status, observed, required } with status met | unmet | waiting.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildBaseDomain, OPERATOR_ID } from '../../src/fixtures/baseDomain'
-import { createCampaign, introduceTicket, applyAction, resetAttempt, closeTicket, startReplay, applyAttemptAction, runScriptRoute, runGuiRoute } from '../../src/tickets/engine'
+import { createCampaign, introduceTicket, applyAction, resetAttempt, closeTicket, startReplay, applyAttemptAction } from '../../src/tickets/engine'
+import { runScriptRoute, runGuiRoute } from '../../src/tickets/routes'
 import { attrEquals } from '../../src/tickets/predicates'
 import type { CaseFixture, TicketDef } from '../../src/tickets/types'
 import { createDefaultRegistry, createRuntime, run } from '../../src/ps/runtime'
