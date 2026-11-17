@@ -1,0 +1,17 @@
+import type { Attempt, Score, TicketDef } from './types'
+
+export function rankFor(completed: TicketDef[], catalog: TicketDef[]): string {
+  const completedIds = new Set(completed.map((ticket) => ticket.id))
+  const tierDone = (tier: TicketDef['tier']) => catalog.filter((ticket) => ticket.tier === tier).every((ticket) => completedIds.has(ticket.id))
+  if (tierDone(1) && tierDone(2) && catalog.some((ticket) => ticket.tier === 3)) return 'Identity Security Engineer'
+  if (tierDone(1) && catalog.some((ticket) => ticket.tier === 2)) return 'IAM Analyst'
+  return 'Helpdesk'
+}
+export function postureFor(attempts: Attempt[]): { posture: number; failedChecks: string[] } {
+  const checks = attempts.flatMap((attempt) => attempt.predicates).filter((predicate) => predicate.posture !== undefined && predicate.weight > 0)
+  const weight = checks.reduce((total, check) => total + check.weight, 0)
+  return { posture: weight === 0 ? 100 : Math.round(checks.reduce((total, check) => total + (check.status === 'met' ? check.weight : 0), 0) / weight * 100), failedChecks: checks.filter((check) => check.status !== 'met').map((check) => check.label) }
+}
+export function scoreCampaign(completed: TicketDef[], catalog: TicketDef[], attempts: Attempt[], activeIncidentCount: number): Score {
+  return { rank: rankFor(completed, catalog), ...postureFor(attempts), activeIncidentCount }
+}

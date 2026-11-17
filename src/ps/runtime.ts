@@ -1,4 +1,6 @@
 import type { DomainState, Guid } from '../domain/types'
+import type { CampaignState, CaseFixture } from '../tickets/types'
+import { recordCommittedAction } from '../tickets/engine'
 import { dispatch } from '../engine/dispatch'
 import type { Action, ActionResult } from '../engine/types'
 import type { Command, Expr, Pipeline, Script, Statement } from './ast'
@@ -64,11 +66,22 @@ export interface RuntimeOptions {
   readSecure?: (prompt: string) => { policy: 'pass' | 'fail' } | undefined
   /** Asks the learner to confirm a change. Without this hook, a change that needs confirmation is cancelled. */
   confirm?: (message: string) => boolean | undefined
+  tickets?: TicketRuntimeHooks
+}
+
+export interface TicketRuntimeHooks {
+  getCampaign(): CampaignState | undefined
+  setCampaign(campaign: CampaignState): void
+  getFixture(ticketId: string): CaseFixture | undefined
 }
 
 /** What a cmdlet may use while it runs. */
 export interface Runtime {
   readonly registry: Registry
+  getTicketCampaign(): CampaignState | undefined
+  setTicketCampaign(campaign: CampaignState): void
+  getTicketFixture(ticketId: string): CaseFixture | undefined
+  replaceState(state: DomainState): void
   readonly transcript: TranscriptEntry[]
   readonly history: string[]
   /** The domain state as the current run sees it. It includes the changes of earlier commands in the same run. */
@@ -122,6 +135,7 @@ class ConsoleRuntime implements Runtime {
   private frame: Frame = { errors: [], committed: [], values: [], chunks: [] }
   /** The working state of the run in progress. The caller's state object is never changed. */
   private draft: DomainState | undefined
+  private ticketDraft: CampaignState | undefined
 
   constructor(private readonly options: RuntimeOptions) { this.registry = options.registry }
 
@@ -129,6 +143,10 @@ class ConsoleRuntime implements Runtime {
     if (!this.draft) throw new PsError('No simulated domain is attached to this console yet.')
     return this.draft
   }
+  getTicketCampaign(): CampaignState | undefined { return this.ticketDraft ?? this.options.tickets?.getCampaign() }
+  setTicketCampaign(campaign: CampaignState): void { this.ticketDraft = campaign }
+  getTicketFixture(ticketId: string): CaseFixture | undefined { return this.options.tickets?.getFixture(ticketId) }
+  replaceState(state: DomainState): void { this.draft = state }
 
   // The location lives in the variable table as $PWD, so a pending run restores it with the other variables.
   get location(): string { const value = this.variables.get('pwd'); return typeof value === 'string' ? value : LAB_HOME }
@@ -160,6 +178,9 @@ class ConsoleRuntime implements Runtime {
     if (!inv.whatIf && result.ok && result.state !== current) {
       this.draft = result.state
       this.frame.committed.push(result)
+      const campaign = this.getTicketCampaign()
+      const fixture = campaign?.active ? this.getTicketFixture(campaign.active.id) : undefined
+      if (campaign && fixture) this.ticketDraft = recordCommittedAction(campaign, fixture, action, result, 'console')
     }
     return result
   }
@@ -373,6 +394,8 @@ class ConsoleRuntime implements Runtime {
 
   execute(source: string, state: DomainState): ConsoleResult {
     this.draft = state
+    const campaignBefore = this.options.tickets?.getCampaign()
+    this.ticketDraft = campaignBefore
     const before = { variables: new Map(this.variables), history: this.history.length, transcript: this.transcript.length }
     this.history.push(source)
     this.transcript.push({ kind: 'input', text: source })
@@ -388,6 +411,7 @@ class ConsoleRuntime implements Runtime {
         try { for (const statement of parsed.script.statements) this.runStatement(statement) } catch (error) {
           // Drop the draft first. Nothing from a run that did not finish may last.
           this.draft = state
+          this.ticketDraft = campaignBefore
           if (!(error instanceof Pending)) throw error
           // Undo everything this run recorded. The host runs the same input again once it has the answer.
           this.variables.clear()
@@ -399,6 +423,7 @@ class ConsoleRuntime implements Runtime {
       }
     }
     const output = frame.chunks.join('\n')
+    if (this.ticketDraft && this.ticketDraft !== campaignBefore) this.options.tickets?.setCampaign(this.ticketDraft)
     if (output) this.transcript.push({ kind: 'output', text: output })
     for (const error of frame.errors) this.transcript.push({ kind: 'error', text: error.help ? `${error.message} Try: ${error.help}` : error.message })
     return { output, values: frame.values, errors: frame.errors, state: this.draft, committed: frame.committed }

@@ -193,24 +193,60 @@ interface TicketDef {
 }
 
 interface CaseFixture {
+  ticketId: string;                // stable ID from TicketDef.id
   ids: Record<string, Guid>;      // one source for names, approvals, hints, routes, predicates
   introduce(base: DomainState): DomainState;
-  request: TicketRequest;         // sender, priority, impact, evidence, what the requester needs
+  request: TicketRequest;         // sender, priority, impact, SLA, read-screen story, evidence, and requester need
   responsibility: { account: string; outcome: string };
   predicates: Predicate[];        // outcome, control, evidence, and order checks
   hints: [Hint, Hint, Hint];      // level 3 uses routes.script
   routes: { script: ScriptStep[]; gui: GuiStep[] };
   wrongFixes: { name: string; steps: ScriptStep[]; expectUnmet: string[] }[];
   debrief(attempt: Attempt): Debrief;
+  transfer: { question: string; choices?: string[]; answer: string; feedback: string };
+}
+
+interface TicketRequest {
+  sender: string;
+  priority: string;
+  impact: string;
+  sla: string;
+  title: string;
+  story: string;
+  goal: string;                   // one sentence: outcome and constraint
+  who: { person: string; account: string };
+  alreadyChecked: string;
+  clue: { text: string; eventId?: number };
+  careful?: string;               // required when the case has a near-match or control object
+  glossary: { term: string; definition: string }[];
+  needs: string;
+  evidence: string[];
 }
 
 interface Predicate {
   id: string;
-  label: string;
+  label: string;                  // plain-language checklist label (DESIGN section 6 Work)
   kind: 'outcome' | 'control' | 'evidence' | 'order';
+  weight?: number;
+  posture?: 'security' | 'availability'; // only tagged checks affect posture
   evaluate(state: DomainState, attempt: Attempt):
     { status: 'met' | 'unmet' | 'waiting'; observed: string; required: string };
 }
+
+interface CampaignState {
+  base: DomainState;
+  queue: string[];                 // TicketDef IDs only; no build functions in saved campaign state
+  completed: string[];
+  active?: Attempt;
+  history: Attempt[];
+}
+
+function runScriptRoute(fixture: CaseFixture, steps?: ScriptStep[], base?: DomainState, seed?: number): RouteResult;
+function runGuiRoute(fixture: CaseFixture, base?: DomainState, seed?: number): RouteResult;
+// Helpers use fixture.ticketId and ids.operator; each returns closed plus live predicates.
+
+// D1 adds read-screen and transfer content; it does not rename existing contract fields.
+// PredicateResult remains { status, observed, required } with status met | unmet | waiting.
 
 interface ScriptStep { code: string; explain: string }
 interface GuiStep { path: string[]; action: Action }   // path is what the learner clicks

@@ -13,6 +13,7 @@ The AD Shield console is a simulated PowerShell subset. It runs in the browser. 
 | `ActiveDirectory` | `New-ADUser`, `Set-ADUser`, `Move-ADObject`, `Enable-ADAccount`, `Disable-ADAccount`, `Unlock-ADAccount`, `Set-ADAccountPassword`, `Add-ADGroupMember`, `Remove-ADGroupMember`, `Add-ADPrincipalGroupMembership` | | T03 P2 |
 | `Microsoft.PowerShell.Diagnostics` | `Get-WinEvent` | | T04 |
 | `ADShield.Sim` | `Test-SimSignIn`, `Test-SimResourceAccess`, `Step-SimClock`, `Add-SimResourcePermission`, `Remove-SimResourcePermission` | | T04 |
+| `ADShield.Sim` | `Get-SimTicket`, `Close-SimTicket`, `Reset-SimAttempt` | | T05 P1 |
 
 Supported parameters:
 
@@ -47,6 +48,9 @@ Supported parameters:
 | `Step-SimClock` | `-Minutes <int>`, `-Hours <int>`, `-Days <int>` |
 | `Add-SimResourcePermission` | `[-Resource] <share>`, `[-Identity] <principal>`, `-Right <right>`, `-Layer Share\|File\|Both`, `-WhatIf`, `-Confirm` |
 | `Remove-SimResourcePermission` | `[-Resource] <share>`, `[-Identity] <principal>`, `-Right <right>`, `-Layer Share\|File\|Both`, `-WhatIf`, `-Confirm` |
+| `Get-SimTicket` | none; reads active ticket, predicate observations, and completion IDs |
+| `Close-SimTicket` | `-WhatIf`; reports observed and required values when predicates block closure |
+| `Reset-SimAttempt` | none; restores checkpoint state and lab clock, keeps completions |
 | `Set-Location` | `[-Path] <string>` |
 | `Get-Location` | none |
 
@@ -136,6 +140,7 @@ These behaviors differ from Windows PowerShell on purpose.
 - **Numbers.** A bare number such as `007` becomes the number `7`. Quote the value to keep the leading zeros.
 - **Confirmation.** A cmdlet with high impact asks for confirmation unless the command has `-Confirm:$false`. `-Confirm` asks for any cmdlet that changes the simulated domain. When the console cannot ask, the change is cancelled and nothing changes.
 - **`-WhatIf`.** The cmdlet previews the change through the action pipeline. The simulated domain does not change, no audit event is written, and no progress is awarded.
+- **Ticket campaign cmdlets.** `Get-SimTicket`, `Close-SimTicket`, and `Reset-SimAttempt` use an optional host-provided campaign hook. Without an active campaign, they report that no simulated ticket is active. `Close-SimTicket -WhatIf` checks predicates without recording completion. All output labels ticket activity as simulated.
 - **`Read-Host`.** Without `-AsSecureString`, the typed line is returned as text and appears in the transcript. Do not type a password there.
 - **`Read-Host -AsSecureString`.** The input is simulated secure input. The lab checks the typed characters against the simulated password policy and then discards them. The console keeps the policy verdict only. The characters never enter a variable, the transcript, the command history, a saved draft, or the simulated domain. The returned object shows as `System.Security.SecureString`.
 - **Prompts in the middle of a script.** `Read-Host` and confirmation questions get their answer from the lab user interface. When the answer is not ready, the console stops the run and shows the prompt. A stopped run changes nothing: the simulated domain, the variables, the command history, and the transcript stay as they were before the run. After the learner answers, the console runs the same input again from the start, and each change is applied exactly once. The learner sees one run. The terminal user interface arrives in T06.

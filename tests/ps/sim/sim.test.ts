@@ -18,7 +18,8 @@ describe('ADShield.Sim cmdlets', () => {
       run('Remove-SimResourcePermission Finance pnair -Right Read', rt).output,
     ]
     for (const output of outputs) expect(output).toContain('simulated')
-    expect(rt.registry.list('ADShield.Sim').map((spec) => spec.name)).toEqual(['Add-SimResourcePermission', 'Remove-SimResourcePermission', 'Step-SimClock', 'Test-SimResourceAccess', 'Test-SimSignIn'])
+    expect(rt.registry.list('ADShield.Sim').map((spec) => spec.name)).toEqual(expect.arrayContaining(['Add-SimResourcePermission', 'Remove-SimResourcePermission', 'Step-SimClock', 'Test-SimResourceAccess', 'Test-SimSignIn']))
+    expect(rt.registry.list('ADShield.Sim').map((spec) => spec.name)).toEqual(expect.arrayContaining(['Close-SimTicket', 'Get-SimTicket', 'Reset-SimAttempt']))
   })
 
   it('Test-SimSignIn issues a session and Test-SimResourceAccess -Session uses its snapshot', () => {
