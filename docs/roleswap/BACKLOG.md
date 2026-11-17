@@ -27,3 +27,5 @@ Not part of the first slice. Each line is one future swap task. Write a full bri
 ## Carried over from the first slice
 
 Add items here as tasks T01 to T10 defer them: nits from audits, bugs too large for T10, and syntax recorded as unimplemented in `docs/SUPPORT.md`.
+
+- **T03 D9, `-ChangePasswordAtLogon`.** Sign-in must honor the `changePasswordAtLogon` attribute that T03 stores instead of `pwdLastSet = 0`. Consider mapping it to `pwdLastSet = 0` in the engine. Scheduled for T04 P2.

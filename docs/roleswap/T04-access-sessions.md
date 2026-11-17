@@ -19,6 +19,7 @@
 **P2 — Claude builds, Codex audits: sessions, permissions actions, console surface**
 
 - `sessions.ts` plus `session.signIn` and `session.end` handlers. A sign-in checks enabled, locked, and credential state, snapshots a security context, and records 4624 or 4625 on the recording host. Failed attempts count toward lockout and record 4740 on the domain controller at the threshold.
+- Sign-in must honor the `changePasswordAtLogon` attribute set by `Set-ADUser -ChangePasswordAtLogon` and `New-ADUser` (T03 D9). Consider mapping it to `pwdLastSet = 0` in the engine.
 - `acl.addEntry` and `acl.removeEntry` handlers (DECISIONS D4).
 - Shares for Pharmacy and Finance in the base fixture, each with resource groups wired for read and modify, following account → global role group → domain local resource group → permission.
 - `ADShield.Sim` cmdlets: `Test-SimSignIn`, `Test-SimResourceAccess` (fresh sign-in by default, or a named existing session), `Step-SimClock`, `Add-SimResourcePermission`, `Remove-SimResourcePermission`.

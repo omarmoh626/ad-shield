@@ -8,7 +8,9 @@ The AD Shield console is a simulated PowerShell subset. It runs in the browser. 
 | --- | --- | --- | --- |
 | `Microsoft.PowerShell.Core` | `Get-Help`, `Get-Command`, `Where-Object` | `help`, `man`, `gcm`, `where`, `?` | T02 |
 | `Microsoft.PowerShell.Utility` | `Get-Member`, `Select-Object`, `Write-Output`, `Read-Host` | `gm`, `select`, `echo`, `write` | T02 |
+| `Microsoft.PowerShell.Management` | `Set-Location`, `Get-Location` | `cd`, `sl`, `chdir`, `gl`, `pwd` | T03 P2 |
 | `ActiveDirectory` | `Get-ADUser`, `Get-ADGroup`, `Get-ADGroupMember`, `Get-ADObject`, `Get-ADPrincipalGroupMembership`, `Search-ADAccount` | | T03 P1 |
+| `ActiveDirectory` | `New-ADUser`, `Set-ADUser`, `Move-ADObject`, `Enable-ADAccount`, `Disable-ADAccount`, `Unlock-ADAccount`, `Set-ADAccountPassword`, `Add-ADGroupMember`, `Remove-ADGroupMember`, `Add-ADPrincipalGroupMembership` | | T03 P2 |
 | `ADShield.Sim` | None yet | | T04 |
 
 Supported parameters:
@@ -28,6 +30,18 @@ Supported parameters:
 | `Get-ADGroupMember` | `-Identity`, `-Recursive` |
 | `Get-ADPrincipalGroupMembership` | `-Identity` |
 | `Search-ADAccount` | `-AccountInactive`, `-TimeSpan`, `-DateTime`, `-LockedOut`, `-AccountDisabled`, `-UsersOnly` |
+| `New-ADUser` | `[-Name] <string>`, `-SamAccountName`, `-GivenName`, `-Surname`, `-DisplayName`, `-Description`, `-Department`, `-Title`, `-Office`, `-EmailAddress`, `-UserPrincipalName`, `-Path`, `-AccountPassword <securestring>`, `-Enabled <bool>`, `-ChangePasswordAtLogon <bool>`, `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Set-ADUser` | `[-Identity]` (pipeline), `-GivenName`, `-Surname`, `-DisplayName`, `-Description`, `-Department`, `-Title`, `-Office`, `-EmailAddress`, `-UserPrincipalName`, `-ChangePasswordAtLogon <bool>`, `-Replace <hashtable>`, `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Move-ADObject` | `[-Identity]` (pipeline), `[-TargetPath] <string>`, `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Enable-ADAccount` | `[-Identity]` (pipeline), `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Disable-ADAccount` | `[-Identity]` (pipeline), `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Unlock-ADAccount` | `[-Identity]` (pipeline), `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Set-ADAccountPassword` | `[-Identity]` (pipeline), `-Reset`, `-NewPassword <securestring>`, `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Add-ADGroupMember` | `[-Identity] <group>` (pipeline), `[-Members] <principals>`, `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Remove-ADGroupMember` | `[-Identity] <group>` (pipeline), `[-Members] <principals>`, `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Add-ADPrincipalGroupMembership` | `[-Identity] <principal>` (pipeline), `[-MemberOf] <groups>`, `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Set-Location` | `[-Path] <string>` |
+| `Get-Location` | none |
 
 Run `Get-Help <cmdlet> -Examples` in the console to see examples. A test runs every example, so each one works.
 
@@ -77,6 +91,16 @@ The console rejects each of these with an error that gives the line and column. 
 ## Simplified behavior
 
 - **Active Directory reads.** Identity lookup accepts sAMAccountName, distinguished name, GUID, and SID, ignoring case. Display names are rejected as identity keys. Filter text supports comparisons, wildcards, logical operators, and `*`; it is parsed as data and never evaluated as code. Inactivity search uses `lastLogonTimestamp`; accounts exactly at the cutoff match. Missing timestamps do not match.
+- **Active Directory writes.** Every write cmdlet builds an action and sends it through the simulated action pipeline; none changes the domain directly. Pipeline input accepts AD objects from `Get-AD*` and `Search-ADAccount`, objects from `Select-Object` (bound by `DistinguishedName` or `SamAccountName`), and strings. A successful change prints nothing unless `-PassThru` is given.
+- **`-WhatIf` messages.** The preview line reads `What if: Performing the operation "<op>" on target "<DN>". (simulated preview; nothing changed)`. `<op>` is `New` for `New-ADUser`, `Move` for `Move-ADObject`, `Set-ADAccountPassword` for that cmdlet, and `Set` for the others. For the membership cmdlets the target is the `-Identity` object.
+- **`New-ADUser` container.** `-Path` wins. Without it, the account goes to the current `AD:` container when the console is inside the drive below its root, and to `CN=Users,DC=corp,DC=contoso,DC=local` otherwise (including at `AD:\` itself). A splatted request resolves the same container as the named form.
+- **`New-ADUser` defaults.** `-SamAccountName` defaults to `-Name`. This default is a lab choice; Microsoft Learn does not document one. Accounts start disabled. `-Enabled $true` enables the account only with a passing simulated `-AccountPassword`.
+- **`New-ADUser` partial results.** With a password that fails the lab policy, the account is still created, stays disabled, has no credential, and the console writes an error that explains the partial result. With `-Enabled $true` and no password, the account is created disabled and the console writes an error. This follows the New-ADUser page on Microsoft Learn: accounts are never enabled unless a valid password is set, and "the account is created if the password fails for any reason." `-PasswordNotRequired` is not modeled.
+- **`-ChangePasswordAtLogon`.** Stored as the attribute `changePasswordAtLogon` instead of setting `pwdLastSet` to 0. Read it with `Get-ADUser -Properties ChangePasswordAtLogon`.
+- **`Set-ADAccountPassword`.** Administrator reset only: `-Reset` is required and `-OldPassword` is not modeled. Without `-NewPassword` the console asks once for a masked simulated password. A preview never asks. A reset does not unlock the account or end issued sessions.
+- **`Remove-ADGroupMember` confirmation.** The console asks once per member removed, not once per command. `-Confirm:$false` skips the question. `-WhatIf` never asks.
+- **`Move-ADObject`.** Accepts a sAMAccountName as well as a DN or GUID. The GUID, SID, and group memberships stay the same.
+- **`AD:` drive.** The prompt starts at `PS C:\Lab>`. `C:\Lab` is the only simulated file system location. `Set-Location` accepts `AD:`, `AD:\<DN>`, `..`, a full DN at the drive root, and an RDN such as `OU=Finance` below it. Only domains, OUs, and containers can be the location. `Get-Location` returns an object with a `Path` property, and `$PWD` returns the path as text. The `Get-AD*` cmdlets do not use the location as a default `-SearchBase`.
 - **Search scope.** `Base` includes only the base object, `OneLevel` includes direct children, and `Subtree` includes the base and descendants.
 
 These behaviors differ from Windows PowerShell on purpose.
@@ -91,6 +115,7 @@ These behaviors differ from Windows PowerShell on purpose.
 - **`Get-Member`.** It shows properties only. It does not show methods, because the console does not support method calls.
 - **`Select-Object`.** A property name that an object does not have becomes an empty column, as in Windows PowerShell. Selected objects have the type name `Selected.<original type>`.
 - **Comparisons.** `-eq`, `-ne`, `-like`, and `-notlike` ignore letter case. The left value decides whether a comparison is numeric or text. A list on the left returns the items that pass.
+- **`$true`, `$false`, and `$null` inside double quotes.** They expand as in Windows PowerShell: `"x $true"` becomes `x True`, `$false` becomes `False`, and `$null` becomes empty text. So `-Filter "Enabled -eq $true"` reaches the filter as `Enabled -eq True`. Single-quoted text is never expanded.
 - **Bare words `true`, `false`, and `null`.** The console reads these bare words as the values `$true`, `$false`, and `$null`. Windows PowerShell reads them as text. Quote the word to pass it as text.
 - **Numbers.** A bare number such as `007` becomes the number `7`. Quote the value to keep the leading zeros.
 - **Confirmation.** A cmdlet with high impact asks for confirmation unless the command has `-Confirm:$false`. `-Confirm` asks for any cmdlet that changes the simulated domain. When the console cannot ask, the change is cancelled and nothing changes.

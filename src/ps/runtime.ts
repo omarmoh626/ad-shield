@@ -6,6 +6,8 @@ import { bind, resolveParameter, type RawItem } from './binder'
 import { coreCmdlets } from './cmdlets/core'
 import { utilityCmdlets } from './cmdlets/utility'
 import { adCmdlets } from './cmdlets/ad'
+import { managementCmdlets } from './cmdlets/management'
+import { LAB_HOME } from './cmdlets/management/location'
 import { formatValues } from './format'
 import { parse } from './parser'
 import { Registry, type CmdletSpec, type Invocation } from './registry'
@@ -69,6 +71,12 @@ export interface Runtime {
   readonly history: string[]
   /** The domain state as the current run sees it. It includes the changes of earlier commands in the same run. */
   readonly state: DomainState
+  /** The console location: `C:\Lab` at startup, or a path on the simulated `AD:` drive (T03 D2). */
+  readonly location: string
+  /** The prompt the terminal shows before input, for example `PS C:\Lab>`. */
+  readonly prompt: string
+  /** Sets the console location. Set-Location validates the path before it calls this. */
+  setLocation(path: string): void
   getVariable(name: string): PsValue
   setVariable(name: string, value: PsValue): void
   /**
@@ -99,7 +107,9 @@ class Pending extends Error {
   constructor(readonly input: PendingInput) { super('pending input') }
 }
 
-const RESERVED = new Set(['_', 'psitem', 'true', 'false', 'null'])
+/** Automatic constants inside an expandable string. `null` maps to the PowerShell null value, which expands to empty text. */
+const EXPANDED_CONSTANTS = new Map<string, PsValue>([['true', true], ['false', false], ['null', null]])
+const RESERVED = new Set(['_', 'psitem', 'true', 'false', 'null', 'pwd'])
 const BLOCK_RULE = 'Only one comparison expression is supported inside a script block in this lab.'
 
 class ConsoleRuntime implements Runtime {
@@ -118,7 +128,12 @@ class ConsoleRuntime implements Runtime {
     return this.draft
   }
 
-  getVariable(name: string): PsValue { return this.variables.get(name.toLowerCase()) ?? null }
+  // The location lives in the variable table as $PWD, so a pending run restores it with the other variables.
+  get location(): string { const value = this.variables.get('pwd'); return typeof value === 'string' ? value : LAB_HOME }
+  get prompt(): string { return `PS ${this.location}>` }
+  setLocation(path: string): void { this.variables.set('pwd', path) }
+
+  getVariable(name: string): PsValue { const key = name.toLowerCase(); return key === 'pwd' ? this.location : this.variables.get(key) ?? null }
   setVariable(name: string, value: PsValue): void { this.variables.set(name.toLowerCase(), value) }
 
   private helpHint(preferred?: CmdletSpec): string | undefined {
@@ -187,7 +202,8 @@ class ConsoleRuntime implements Runtime {
     switch (expr.kind) {
       case 'literal':
         if (!expr.parts) return expr.value
-        return expr.parts.map((part) => (part.kind === 'text' ? part.value : toText(this.variable(part.name, item)))).join('')
+        // Inside double quotes $true, $false, and $null expand as in PowerShell: "True", "False", and "" (T03 D10).
+        return expr.parts.map((part) => (part.kind === 'text' ? part.value : toText(EXPANDED_CONSTANTS.has(part.name.toLowerCase()) ? EXPANDED_CONSTANTS.get(part.name.toLowerCase()) as PsValue : this.variable(part.name, item)))).join('')
       case 'variable': return this.variable(expr.name, item)
       case 'property': return getProperty(this.evaluate(expr.target, item), expr.name) ?? null
       case 'array': return expr.items.map((entry) => this.evaluate(entry, item))
@@ -393,7 +409,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
 
 /** A registry with the discovery cmdlets of this slice. Later tasks register more modules on it. */
 export function createDefaultRegistry(): Registry {
-  return new Registry().register(...coreCmdlets, ...utilityCmdlets, ...adCmdlets)
+  return new Registry().register(...coreCmdlets, ...utilityCmdlets, ...managementCmdlets, ...adCmdlets)
 }
 
 /**

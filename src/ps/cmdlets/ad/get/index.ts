@@ -6,15 +6,15 @@ import { PsError, isObject, type PsObject, type PsScriptBlock, type PsValue } fr
 import { compileFilter } from '../filter'
 import { resolveIdentity } from '../identity'
 
-const USER = 'Microsoft.ActiveDirectory.Management.ADUser', GROUP = 'Microsoft.ActiveDirectory.Management.ADGroup', OBJECT = 'Microsoft.ActiveDirectory.Management.ADObject'
-const MEMBER = 'Microsoft.ActiveDirectory.Management.ADPrincipal'
+export const USER = 'Microsoft.ActiveDirectory.Management.ADUser', GROUP = 'Microsoft.ActiveDirectory.Management.ADGroup', OBJECT = 'Microsoft.ActiveDirectory.Management.ADObject'
+export const MEMBER = 'Microsoft.ActiveDirectory.Management.ADPrincipal'
 const identitySet: ParameterSet[] = [{ name: 'Identity', parameters: [{ name: 'Identity', type: 'object', position: 0, mandatory: true }, { name: 'Properties', type: 'string[]' }] }]
 const filterSet: ParameterSet[] = [{ name: 'Filter', parameters: [{ name: 'Filter', type: 'object', mandatory: true }, { name: 'Properties', type: 'string[]' }, { name: 'SearchBase', type: 'string' }, { name: 'SearchScope', type: 'string', values: ['Base', 'OneLevel', 'Subtree'] }] }]
 const attrsFor = (o: DirObject, key: string): unknown => {
   const known: Record<string, unknown> = { Name: o.rdn, DistinguishedName: '', ObjectGUID: o.guid, SID: o.sid ?? '', ObjectClass: o.objectClass, SamAccountName: o.attrs.sAMAccountName ?? '', Enabled: o.attrs.enabled ?? false }
   return Object.entries(known).find(([name]) => name.toLowerCase() === key.toLowerCase())?.[1] ?? Object.entries(o.attrs).find(([name]) => name.toLowerCase() === key.toLowerCase())?.[1]
 }
-function adValue(state: DomainState, o: DirObject, type: string, properties?: string[]): PsObject {
+export function adValue(state: DomainState, o: DirObject, type: string, properties?: string[]): PsObject {
   const defaults = type === USER ? ['DistinguishedName', 'Enabled', 'GivenName', 'Name', 'ObjectClass', 'ObjectGUID', 'SamAccountName', 'SID', 'Surname', 'UserPrincipalName'] : type === GROUP ? ['DistinguishedName', 'GroupCategory', 'GroupScope', 'Name', 'ObjectClass', 'ObjectGUID', 'SamAccountName', 'SID'] : ['DistinguishedName', 'Name', 'ObjectClass', 'ObjectGUID', 'SID']
   const requested = properties?.includes('*') ? [...new Set([...defaults, 'LockedOut', ...Object.keys(o.attrs)])] : properties ? [...new Set([...defaults, ...properties])] : undefined
   const names = requested ?? defaults
