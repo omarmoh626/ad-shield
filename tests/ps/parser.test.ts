@@ -131,6 +131,18 @@ describe('PowerShell parser', () => {
     if (pipe?.kind === 'pipeline') expect(pipe.commands[0].arguments[0].value).toMatchObject({kind:'literal', parts:[{kind:'text',value:'a '},{kind:'variable',name:'x'},{kind:'text',value:' $x '},{kind:'variable',name:'y'}]})
   })
 
+  it('parses a comma list of three or more items as one flat array', () => {
+    const result = parse('Get-X -Names a, b, c 1, 2, 3, 4')
+    expect(result.errors).toEqual([])
+    const pipe = result.script?.statements[0].pipeline
+    expect(pipe?.kind).toBe('pipeline')
+    if (pipe?.kind === 'pipeline') {
+      expect(pipe.commands[0].parameters[0].value).toMatchObject({ kind: 'array', items: [{ value: 'a' }, { value: 'b' }, { value: 'c' }] })
+      expect(pipe.commands[0].arguments[0].value).toMatchObject({ kind: 'array', items: [{ value: 1 }, { value: 2 }, { value: 3 }, { value: 4 }] })
+    }
+    expect.assertions(4)
+  })
+
   it('keeps command and parameter spelling as typed', () => {
     const result = parse('gEt-X -nAmE value'), pipe = result.script?.statements[0].pipeline
     if (pipe?.kind === 'pipeline') expect([pipe.commands[0].name, pipe.commands[0].parameters[0].name]).toEqual(['gEt-X','nAmE'])

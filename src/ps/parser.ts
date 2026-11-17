@@ -116,7 +116,8 @@ class Parser {
     else { this.fail(`Expected expression, got '${token.value}'.`, token); left = { kind: 'literal', value: token.value, line: token.line, column: token.column } }
     if (this.accept(',')) {
       const items = [left]
-      do { items.push(this.expression(2)) } while (this.accept(','))
+      // The nested call reads the rest of the list, so its items are spliced in to keep `a, b, c` one flat array.
+      do { const next = this.expression(2); if (next.kind === 'array') items.push(...next.items); else items.push(next) } while (this.accept(','))
       left = { kind: 'array', items, line: token.line, column: token.column }
     }
     return this.binaryTail(left, min)
