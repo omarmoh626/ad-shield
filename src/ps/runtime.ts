@@ -7,6 +7,8 @@ import { coreCmdlets } from './cmdlets/core'
 import { utilityCmdlets } from './cmdlets/utility'
 import { adCmdlets } from './cmdlets/ad'
 import { managementCmdlets } from './cmdlets/management'
+import { simCmdlets } from './cmdlets/sim'
+import { diagnosticsCmdlets } from './cmdlets/diagnostics'
 import { LAB_HOME } from './cmdlets/management/location'
 import { formatValues } from './format'
 import { parse } from './parser'
@@ -409,7 +411,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
 
 /** A registry with the discovery cmdlets of this slice. Later tasks register more modules on it. */
 export function createDefaultRegistry(): Registry {
-  return new Registry().register(...coreCmdlets, ...utilityCmdlets, ...managementCmdlets, ...adCmdlets)
+  return new Registry().register(...coreCmdlets, ...utilityCmdlets, ...managementCmdlets, ...adCmdlets, ...diagnosticsCmdlets, ...simCmdlets)
 }
 
 /**

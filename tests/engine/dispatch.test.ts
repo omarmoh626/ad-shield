@@ -99,7 +99,7 @@ describe('dispatch pipeline', () => {
       [{ type: 'group.addMember', group: ids['group.pharmacyStaff'], member: ids['user.pnair'] }, 'conflict'],
       [{ type: 'group.removeMember', group: ids['group.pharmacyStaff'], member: ids['user.kmorita'] }, 'notFound'],
       [{ type: 'clock.advance', milliseconds: -5 }, 'invalid'],
-      [{ type: 'session.end', session: 's1' }, 'unsupported'],
+      [{ type: 'session.end', session: 's1' }, 'notFound'],
     ]
     for (const [action, error] of failures) {
       const result = run(base.state, action)

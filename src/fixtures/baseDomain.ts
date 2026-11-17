@@ -2,6 +2,8 @@ import { createDomainState, createObject } from '../domain/graph'
 import { buildIndexes } from '../domain/indexes'
 import type { AttrValue, DomainState, Guid, Membership, ObjectClass } from '../domain/types'
 import type { GroupCategory, GroupScope } from '../engine/groups'
+import type { Ace as ResourceAce, Resource, Right } from '../access/types'
+import type { ResourceAdminAce } from '../engine/handlers/acl'
 import type { DelegationAce } from '../engine/types'
 
 /**
@@ -20,6 +22,8 @@ export const DOMAIN_DNS_NAME = 'corp.contoso.local'
 export const LAB_START = 1768222800000
 /** Fixture ID of the analyst's operator account (DECISIONS D5). */
 export const OPERATOR_ID = 'user.operator'
+/** Fixture ID of the analyst's admin workstation, where the lab console runs (T04 D9). */
+export const ADMIN_WORKSTATION_ID = 'computer.itAdm01'
 
 const WELL_KNOWN_FIRST_RID = 512
 const FIRST_ORDINARY_RID = 1100
@@ -109,6 +113,18 @@ const DELEGATIONS: readonly (readonly [string, readonly ObjectClass[]])[] = [
   ['ou.groups', ['group']],
 ]
 
+interface ShareSeed { id: string; name: string; description: string; grants: readonly (readonly [string, Right])[] }
+
+/**
+ * Department shares on FS01. Each follows account, then global role group, then
+ * domain local resource group, then permission. Both the share layer and the
+ * file layer grant the resource groups, so both layers must allow.
+ */
+const SHARES: readonly ShareSeed[] = [
+  { id: 'share.pharmacy', name: 'Pharmacy', description: 'Simulated Pharmacy department share', grants: [['group.pharmacyShareRead', 'read'], ['group.pharmacyShareModify', 'modify']] },
+  { id: 'share.finance', name: 'Finance', description: 'Simulated Finance department share', grants: [['group.financeShareRead', 'read'], ['group.financeShareModify', 'modify']] },
+]
+
 export function buildBaseDomain(seed = 1): BaseDomain {
   let state = createDomainState(seed, LAB_START)
   const ids: Record<string, Guid> = {}
@@ -179,14 +195,30 @@ export function buildBaseDomain(seed = 1): BaseDomain {
 
   GROUPS.forEach(addGroup)
 
+  // Added after the groups so the GUIDs and RIDs of earlier fixture objects stay the same.
+  addComputer(ADMIN_WORKSTATION_ID, 'ou.workstations', 'IT-ADM01', { operatingSystem: 'Windows 11 Enterprise', description: 'Analyst admin workstation. The lab console runs here.', isAnalystWorkstation: true })
+
   const resolve = (id: string): Guid => {
     if (!(id in ids)) throw new Error(`Unknown fixture ID ${id}`)
     return ids[id]
   }
   const memberships: Membership[] = MEMBERSHIPS.map(([group, member]) => ({ group: resolve(group), member: resolve(member) }))
-  const aces: DelegationAce[] = DELEGATIONS.map(([scope, objectClasses]) => ({ kind: 'delegation', trustee: resolve('group.itHelpdesk'), scope: resolve(scope), objectClasses: [...objectClasses] }))
+  const delegations: DelegationAce[] = DELEGATIONS.map(([scope, objectClasses]) => ({ kind: 'delegation', trustee: resolve('group.itHelpdesk'), scope: resolve(scope), objectClasses: [...objectClasses] }))
+
+  const fileServer = resolve('computer.fs01')
+  const resources: Record<string, Resource> = {}
+  const shareAces: ResourceAce[] = []
+  const shareAdmins: ResourceAdminAce[] = []
+  for (const share of SHARES) {
+    resources[share.id] = { id: share.id, name: share.name, shareLayer: 'share', fileLayer: 'file', host: fileServer, path: `\\\\FS01.${DOMAIN_DNS_NAME}\\${share.name}`, description: share.description }
+    for (const [group, right] of share.grants) {
+      for (const layer of ['share', 'file'] as const) shareAces.push({ resourceId: share.id, layer, trustee: resolve(group), right, effect: 'allow' })
+    }
+    // The helpdesk may change permissions on the department shares (DECISIONS D4).
+    shareAdmins.push({ kind: 'resourceAdmin', trustee: resolve('group.itHelpdesk'), resourceId: share.id })
+  }
 
   // Every fixture object carries rev 1, so the finished fixture is revision 1.
-  const finished = { ...state, revision: 1, memberships, aces }
+  const finished = { ...state, revision: 1, memberships, resources, aces: [...delegations, ...shareAces, ...shareAdmins] }
   return { state: { ...finished, indexes: buildIndexes(finished) }, ids }
 }

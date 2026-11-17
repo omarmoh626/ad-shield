@@ -29,3 +29,4 @@ Not part of the first slice. Each line is one future swap task. Write a full bri
 Add items here as tasks T01 to T10 defer them: nits from audits, bugs too large for T10, and syntax recorded as unimplemented in `docs/SUPPORT.md`.
 
 - **T03 D9, `-ChangePasswordAtLogon`.** Sign-in must honor the `changePasswordAtLogon` attribute that T03 stores instead of `pwdLastSet = 0`. Consider mapping it to `pwdLastSet = 0` in the engine. Scheduled for T04 P2.
+- **Tests in a read-only sandbox (from T04 P2 audit).** Make `npm test` runnable when `node_modules` is read-only, for example with Vite's runner config loader (`--configLoader runner`) so Vitest does not write `node_modules/.vite-temp`. Codex can then run the test checks during reviews.

@@ -11,7 +11,8 @@ The AD Shield console is a simulated PowerShell subset. It runs in the browser. 
 | `Microsoft.PowerShell.Management` | `Set-Location`, `Get-Location` | `cd`, `sl`, `chdir`, `gl`, `pwd` | T03 P2 |
 | `ActiveDirectory` | `Get-ADUser`, `Get-ADGroup`, `Get-ADGroupMember`, `Get-ADObject`, `Get-ADPrincipalGroupMembership`, `Search-ADAccount` | | T03 P1 |
 | `ActiveDirectory` | `New-ADUser`, `Set-ADUser`, `Move-ADObject`, `Enable-ADAccount`, `Disable-ADAccount`, `Unlock-ADAccount`, `Set-ADAccountPassword`, `Add-ADGroupMember`, `Remove-ADGroupMember`, `Add-ADPrincipalGroupMembership` | | T03 P2 |
-| `ADShield.Sim` | None yet | | T04 |
+| `Microsoft.PowerShell.Diagnostics` | `Get-WinEvent` | | T04 |
+| `ADShield.Sim` | `Test-SimSignIn`, `Test-SimResourceAccess`, `Step-SimClock`, `Add-SimResourcePermission`, `Remove-SimResourcePermission` | | T04 |
 
 Supported parameters:
 
@@ -40,6 +41,12 @@ Supported parameters:
 | `Add-ADGroupMember` | `[-Identity] <group>` (pipeline), `[-Members] <principals>`, `-PassThru`, `-WhatIf`, `-Confirm` |
 | `Remove-ADGroupMember` | `[-Identity] <group>` (pipeline), `[-Members] <principals>`, `-PassThru`, `-WhatIf`, `-Confirm` |
 | `Add-ADPrincipalGroupMembership` | `[-Identity] <principal>` (pipeline), `[-MemberOf] <groups>`, `-PassThru`, `-WhatIf`, `-Confirm` |
+| `Get-WinEvent` | `[-FilterHashtable] <hashtable>` with keys `LogName` (required), `Id` (one or a list), `StartTime`, `EndTime`; `-ComputerName <string>`, `-MaxEvents <int>` |
+| `Test-SimSignIn` | `[-Identity] <user>`, `[-ComputerName] <string>`, `-SimulateBadPassword` |
+| `Test-SimResourceAccess` | `[-Identity] <user>` or `-Session <id or Test-SimSignIn output>`, `-Resource <share>`, `-Right Read\|Write\|Modify\|FullControl` |
+| `Step-SimClock` | `-Minutes <int>`, `-Hours <int>`, `-Days <int>` |
+| `Add-SimResourcePermission` | `[-Resource] <share>`, `[-Identity] <principal>`, `-Right <right>`, `-Layer Share\|File\|Both`, `-WhatIf`, `-Confirm` |
+| `Remove-SimResourcePermission` | `[-Resource] <share>`, `[-Identity] <principal>`, `-Right <right>`, `-Layer Share\|File\|Both`, `-WhatIf`, `-Confirm` |
 | `Set-Location` | `[-Path] <string>` |
 | `Get-Location` | none |
 
@@ -101,6 +108,15 @@ The console rejects each of these with an error that gives the line and column. 
 - **`Remove-ADGroupMember` confirmation.** The console asks once per member removed, not once per command. `-Confirm:$false` skips the question. `-WhatIf` never asks.
 - **`Move-ADObject`.** Accepts a sAMAccountName as well as a DN or GUID. The GUID, SID, and group memberships stay the same.
 - **`AD:` drive.** The prompt starts at `PS C:\Lab>`. `C:\Lab` is the only simulated file system location. `Set-Location` accepts `AD:`, `AD:\<DN>`, `..`, a full DN at the drive root, and an RDN such as `OU=Finance` below it. Only domains, OUs, and containers can be the location. `Get-Location` returns an object with a `Path` property, and `$PWD` returns the path as text. The `Get-AD*` cmdlets do not use the location as a default `-SearchBase`.
+- **Shares and permissions.** The lab models two shares on FS01, Pharmacy and Finance. Each has a share layer and a file (NTFS) layer, and both must allow. Rights are Read, Write, Modify (read and write), and FullControl. Entries are evaluated in Windows DACL order: explicit deny, explicit allow, inherited deny, inherited allow. The first entry that applies decides the layer. A deny applies when its right overlaps the request; an allow must cover the whole request. Allow entries are not added together across entries. Directory object ACLs, `Get-Acl`, and `Set-Acl` are not modeled.
+- **Security context.** A context holds the user SID, the primary group, and every security group reached through valid nesting. Distribution groups never appear in it.
+- **`Test-SimResourceAccess`.** Read-only: it records no event, issues no session, has no `-WhatIf`, and awards nothing. Without `-Session` it models a fresh sign-in from current memberships; if that sign-in would fail, it says why and runs no access check. With `-Session` it uses the snapshot taken at sign-in time.
+- **Sessions.** `Test-SimSignIn` issues a session that keeps its security context until it ends or expires after ten lab hours. Nothing refreshes it: a membership change reaches only a new sign-in. Permission changes on a share apply to existing sessions at the next check, as in Windows. A password reset does not end sessions. Kerberos tickets and Entra tokens are not modeled separately.
+- **Sign-in checks.** In order: disabled (4625, sub-status `0xC0000072`), locked out (`0xC0000234`), no credential or `-SimulateBadPassword` (`0xC000006A`), must change password (`0xC0000224`). Only a bad password counts toward lockout. Five in a row lock the account and record 4740 on DC01. A success resets `badPwdCount`. Lockout has no duration and no observation window: the account stays locked until `Unlock-ADAccount`. Every sign-in is interactive (logon type 2).
+- **`-ChangePasswordAtLogon`.** A sign-in is refused while `changePasswordAtLogon` is `$true` or `pwdLastSet` is 0. The lab has no password-change dialog. Clear the flag with `Set-ADUser -ChangePasswordAtLogon $false` after a reset.
+- **Event hosts.** 4624 and 4625 are recorded on the computer where the user signed in. 4740 and directory changes are recorded on DC01. Simulator activity (clock, permission changes, ending a session) has origin `simulator` and never appears in `Get-WinEvent`.
+- **`Get-WinEvent`.** As in Windows, without `-ComputerName` it reads the local computer only. The lab console runs on the analyst's admin workstation `IT-ADM01`, so directory events such as 4740 need `-ComputerName DC01`, and sign-in events need the computer where the user signed in. Only the `FilterHashtable` parameter set is supported. Times are UTC lab time, shown as `YYYY-MM-DDTHH:MM:SSZ`. When nothing matches, it writes the Windows error "No events were found that match the specified selection criteria."
+- **Lab clock.** `Step-SimClock` moves the lab clock forward only. The real clock is never read.
 - **Search scope.** `Base` includes only the base object, `OneLevel` includes direct children, and `Subtree` includes the base and descendants.
 
 These behaviors differ from Windows PowerShell on purpose.

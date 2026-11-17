@@ -6,6 +6,8 @@ import type { Need } from './authz'
 import { EVENT_ID, MEMBER_ADDED, MEMBER_REMOVED, simulatorEvent, windowsEvent, type EventDraft } from './events'
 import { canNest, containsGroup, groupCategory, groupScope, isPrimaryGroupOf, memberKind } from './groups'
 import type { Action, ActionCtx, ActionError, ActionType, ActionWarning, Change } from './types'
+import { aclAddEntry, aclRemoveEntry } from './handlers/acl'
+import { sessionEnd, sessionSignIn } from './handlers/session'
 
 export interface Failure {
   error: ActionError
@@ -304,7 +306,7 @@ const clockAdvance: Handler<'clock.advance'> = (state, action, ctx) => ({
   },
 })
 
-/** Tier 1 handlers built in T01. The `acl.*` and `session.*` actions arrive in T04. */
+/** Tier 1 handlers. T01 built the directory and clock handlers; T04 added `acl.*` and `session.*`. */
 export const handlers: { [T in ActionType]?: Handler<T> } = {
   'user.create': userCreate,
   'user.setAttrs': userSetAttrs,
@@ -315,4 +317,8 @@ export const handlers: { [T in ActionType]?: Handler<T> } = {
   'group.addMember': groupAddMember,
   'group.removeMember': groupRemoveMember,
   'clock.advance': clockAdvance,
+  'acl.addEntry': aclAddEntry,
+  'acl.removeEntry': aclRemoveEntry,
+  'session.signIn': sessionSignIn,
+  'session.end': sessionEnd,
 }

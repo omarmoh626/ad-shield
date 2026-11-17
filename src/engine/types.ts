@@ -1,3 +1,4 @@
+import type { AccessLayerName, Right } from '../access/types'
 import type { Ace, AttrValue, AuditEvent, DomainState, Guid, ObjectClass } from '../domain/types'
 
 export type Source = 'console' | 'gui' | 'system'
@@ -26,24 +27,28 @@ export type Action =
   | { type: 'object.move'; target: Guid; newParent: Guid }
   | { type: 'group.addMember'; group: Guid; member: Guid }
   | { type: 'group.removeMember'; group: Guid; member: Guid }
-  | { type: 'acl.addEntry'; resource: string; trustee: Guid; right: string }
-  | { type: 'acl.removeEntry'; resource: string; trustee: Guid; right: string }
-  | { type: 'session.signIn'; user: Guid; host: Guid }
+  | { type: 'acl.addEntry'; resource: string; trustee: Guid; right: Right; layer?: AclLayer }
+  | { type: 'acl.removeEntry'; resource: string; trustee: Guid; right: Right; layer?: AclLayer }
+  /** A simulated sign-in by `user` at the computer `host`. `badPassword` simulates a mistyped password. No password value exists. */
+  | { type: 'session.signIn'; user: Guid; host: Guid; badPassword?: boolean }
   | { type: 'session.end'; session: string }
   | { type: 'clock.advance'; milliseconds: number }
+
+/** Which permission layer of a share an `acl.*` action changes. Omitted means both layers. */
+export type AclLayer = AccessLayerName | 'both'
 
 export type ActionType = Action['type']
 
 export type ActionError = 'notFound' | 'denied' | 'invalid' | 'conflict' | 'stale' | 'unsupported'
 
-export type WarningCode = 'passwordRejected' | 'notEnabled' | 'notPermissionBearing' | 'noChange'
+export type WarningCode = 'passwordRejected' | 'notEnabled' | 'notPermissionBearing' | 'noChange' | 'signInFailed'
 
 export interface ActionWarning {
   code: WarningCode
   message: string
 }
 
-export type ChangeKind = 'object' | 'attr' | 'location' | 'membership' | 'clock'
+export type ChangeKind = 'object' | 'attr' | 'location' | 'membership' | 'clock' | 'session' | 'acl'
 
 /** One before and after pair. `undefined` means the value did not exist on that side. */
 export interface Change {
