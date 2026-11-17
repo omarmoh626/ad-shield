@@ -2,6 +2,15 @@
 
 The AD Shield console is a simulated PowerShell subset. It runs in the browser. It never reaches a real system, a host shell, or the network. This file lists what the console supports, what it rejects, and where it is simpler than Windows PowerShell. Every task that adds or changes console behavior updates this file.
 
+## Design choices
+
+- T06 P1 uses the approved blue-gray slate tokens from `docs/roleswap/DESIGN.md` section 2. The workspace exposes PowerShell, Directory, and Evidence tabs; Directory and Evidence remain placeholders until their implementation phase.
+- The shell starts on case 01's PowerShell work area. Hints, full inbox behavior, criteria, and debrief are deferred to T06 P2.
+- Secure input is an uncontrolled password field labelled "simulated". The characters never enter React state. The terminal computes a password-policy verdict, queues it, clears the field, and replays the run. The characters never reach the draft, history, transcript, or saved data.
+- Simplified password policy for secure input: at least 12 characters with an upper-case letter, a lower-case letter, and a digit. The terminal checks it; the domain stores the verdict and a new credential version only.
+- The SLA countdown is a real timer in the browser (D4). Pause stops it. It never moves lab time, writes an audit event, or changes the state revision. Lab time moves only through **Advance lab time** (a recorded `clock.advance` action) or actions a case defines.
+- Region slots follow D1: the header is `top`, the Work screen's left rail is `left`, the Directory tab is `upper`, and the PowerShell tab is `lower`. The four-region layout from the spec became a Read screen plus a tabbed Work screen (DESIGN.md section 9).
+
 ## Modules and cmdlets
 
 | Module | Cmdlets | Aliases | Added in |
