@@ -8,7 +8,7 @@ The AD Shield console is a simulated PowerShell subset. It runs in the browser. 
 | --- | --- | --- | --- |
 | `Microsoft.PowerShell.Core` | `Get-Help`, `Get-Command`, `Where-Object` | `help`, `man`, `gcm`, `where`, `?` | T02 |
 | `Microsoft.PowerShell.Utility` | `Get-Member`, `Select-Object`, `Write-Output`, `Read-Host` | `gm`, `select`, `echo`, `write` | T02 |
-| `ActiveDirectory` | None yet | | T03 |
+| `ActiveDirectory` | `Get-ADUser`, `Get-ADGroup`, `Get-ADGroupMember`, `Get-ADObject`, `Get-ADPrincipalGroupMembership`, `Search-ADAccount` | | T03 P1 |
 | `ADShield.Sim` | None yet | | T04 |
 
 Supported parameters:
@@ -22,6 +22,12 @@ Supported parameters:
 | `Select-Object` | `[-Property] <string[]>` with wildcards, `-ExpandProperty <string>`, `-First <int>`, `-Last <int>` |
 | `Write-Output` | `[-InputObject] <Object[]>` |
 | `Read-Host` | `[-Prompt] <string>`, `-AsSecureString` |
+| `Get-ADUser` | `-Identity`, `-Filter`, `-Properties`, `-SearchBase`, `-SearchScope` |
+| `Get-ADGroup` | `-Identity`, `-Filter`, `-Properties`, `-SearchBase`, `-SearchScope` |
+| `Get-ADObject` | `-Identity`, `-Filter`, `-Properties`, `-SearchBase`, `-SearchScope` |
+| `Get-ADGroupMember` | `-Identity`, `-Recursive` |
+| `Get-ADPrincipalGroupMembership` | `-Identity` |
+| `Search-ADAccount` | `-AccountInactive`, `-TimeSpan`, `-DateTime`, `-LockedOut`, `-AccountDisabled`, `-UsersOnly` |
 
 Run `Get-Help <cmdlet> -Examples` in the console to see examples. A test runs every example, so each one works.
 
@@ -38,8 +44,8 @@ Run `Get-Help <cmdlet> -Examples` in the console to see examples. A test runs ev
 - Comma lists: `-Property Name, Source`.
 - Hashtable literals: `@{ Name = 'x'; Count = 2 }`.
 - Splatting a hashtable or a list: `Get-Command @params`.
-- Script blocks that hold one comparison expression, with `$_` or `$PSItem` as the current object.
-- Comparison and logical operators inside script blocks: `-eq`, `-ne`, `-like`, `-notlike`, `-gt`, `-ge`, `-lt`, `-le`, `-and`, `-or`, `-not`.
+- Script blocks passed to ActiveDirectory `-Filter` keep their source and use the same parsed comparison grammar as quoted filters. Property names can appear bare or through `$_`/`$PSItem`.
+- Other script blocks hold one comparison expression, with `$_` or `$PSItem` as the current object. Comparison and logical operators: `-eq`, `-ne`, `-like`, `-notlike`, `-gt`, `-ge`, `-lt`, `-le`, `-and`, `-or`, `-not`.
 - Pipelines of typed objects.
 - `;` and a new line as statement separators.
 - Line continuation with a backtick at the end of a line, or with a `|` at the end of a line.
@@ -57,7 +63,7 @@ The console rejects each of these with an error that gives the line and column. 
 - Method calls: `$x.ToString()`.
 - Redirection: `>`, `>>`, `2>&1`, `<`.
 - The call operator `&` and dot-sourcing.
-- Commands inside a script block. A script block holds one comparison expression only.
+- Commands inside a script block, except ActiveDirectory `-Filter` blocks that use the constrained filter grammar above.
 - Assignment inside a script block.
 - Assignment to a property: `$u.Name = 'x'`.
 - Compound assignment: `+=`, `-=`.
@@ -69,6 +75,9 @@ The console rejects each of these with an error that gives the line and column. 
 - `${name}` inside a double-quoted string. The text stays literal.
 
 ## Simplified behavior
+
+- **Active Directory reads.** Identity lookup accepts sAMAccountName, distinguished name, GUID, and SID, ignoring case. Display names are rejected as identity keys. Filter text supports comparisons, wildcards, logical operators, and `*`; it is parsed as data and never evaluated as code. Inactivity search uses `lastLogonTimestamp`; accounts exactly at the cutoff match. Missing timestamps do not match.
+- **Search scope.** `Base` includes only the base object, `OneLevel` includes direct children, and `Subtree` includes the base and descendants.
 
 These behaviors differ from Windows PowerShell on purpose.
 

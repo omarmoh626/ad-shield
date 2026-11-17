@@ -8,7 +8,7 @@ const unsupported = 'Unsupported syntax: subexpressions, loops, if, functions, m
 class Parser {
   private i = 0
   readonly errors: ParseError[]
-  constructor(private readonly tokens: Token[], initial: ParseError[] = []) { this.errors = [...initial] }
+  constructor(private readonly tokens: Token[], initial: ParseError[] = [], private readonly source = '') { this.errors = [...initial] }
   private get t(): Token { return this.tokens[this.i] ?? this.tokens[this.tokens.length - 1] }
   private take(): Token { const t = this.t; if (this.i < this.tokens.length - 1) this.i++; return t }
   private accept(value: string): Token | undefined { const kind = '|{}(),;.:='.includes(value) ? 'punctuation' : 'word'; if (value === ';') { if (this.t.kind === 'separator') return this.take() } else if (this.t.kind === kind && this.t.value.toLowerCase() === value.toLowerCase()) return this.take(); return undefined }
@@ -62,9 +62,9 @@ class Parser {
     while ((this.t as Token).kind !== 'eof' && (this.t as Token).kind !== 'separator' && !(this.t.kind === 'punctuation' && this.t.value === '|')) {
       if (this.t.kind === 'parameter' && this.t.value.startsWith('-')) {
         const p = this.take(), pname = p.value.slice(1)
-        if ((this.t as Token).kind === 'punctuation' && this.t.value === ':') { this.take(); const value = this.expression(); parameters.push({ kind: 'parameter', name: pname, value, switch: false, colon: true, line: p.line, column: p.column }) }
+        if ((this.t as Token).kind === 'punctuation' && this.t.value === ':') { this.take(); const current = this.t as Token; const value = pname.toLowerCase() === 'filter' && current.kind === 'punctuation' && current.value === '{' ? this.filterScriptBlock() : this.expression(); parameters.push({ kind: 'parameter', name: pname, value, switch: false, colon: true, line: p.line, column: p.column }) }
         else if ((this.t as Token).kind === 'punctuation' && this.t.value === '=' && !args.length && !parameters.length) { this.fail(`Assignment operators are not valid here. ${unsupported}`, this.t, unsupported); this.take() }
-        else if (this.startsValue(this.t)) { const value = this.expression(); parameters.push({ kind: 'parameter', name: pname, value, switch: false, colon: false, line: p.line, column: p.column }) }
+        else if (this.startsValue(this.t)) { const current = this.t as Token; const value = pname.toLowerCase() === 'filter' && current.kind === 'punctuation' && current.value === '{' ? this.filterScriptBlock() : this.expression(); parameters.push({ kind: 'parameter', name: pname, value, switch: false, colon: false, line: p.line, column: p.column }) }
         else parameters.push({ kind: 'parameter', name: pname, switch: true, colon: false, line: p.line, column: p.column })
       } else if ((this.t as Token).kind === 'parameter' && this.t.value.startsWith('@')) {
         const t = this.take(), variable = { kind: 'variable' as const, name: t.value.slice(1), line: t.line, column: t.column }
@@ -75,6 +75,29 @@ class Parser {
     return { kind: 'command', name, parameters, arguments: args, line: start.line, column: start.column }
   }
   private startsValue(t: Token): boolean { return ['word', 'string', 'number', 'variable'].includes(t.kind) || (t.kind === 'operator' && t.value.toLowerCase() === '-not') || (t.kind === 'punctuation' && ['{', '@'].includes(t.value)) }
+  /** Keep AD filter block text raw; the AD filter parser validates this constrained grammar later. */
+  private filterScriptBlock(): Expr {
+    const open = this.take()
+    const start = this.offset(open.line, open.column) + 1
+    let depth = 1
+    let close = this.t
+    while (this.t.kind !== 'eof' && depth > 0) {
+      const token = this.take()
+      if (token.kind === 'punctuation' && token.value === '{') depth += 1
+      if (token.kind === 'punctuation' && token.value === '}') {
+        depth -= 1
+        if (depth === 0) { close = token; break }
+      }
+    }
+    if (depth !== 0) this.fail('Unbalanced brace: expected }.', open)
+    const end = depth === 0 ? this.offset(close.line, close.column) : this.source.length
+    return { kind: 'scriptBlock', statements: [], source: this.source.slice(start, end), line: open.line, column: open.column } as unknown as Expr
+  }
+  private offset(line: number, column: number): number {
+    let index = 0
+    for (let currentLine = 1; currentLine < line; currentLine += 1) index = this.source.indexOf('\n', index) + 1
+    return index + column - 1
+  }
   private expression(min = 0): Expr {
     if (this.t.kind === 'operator' && this.t.value.toLowerCase() === '-not') {
       const op = this.take(), operand = this.expression(4)
@@ -159,5 +182,5 @@ class Parser {
 
 export function parse(source: string): { script?: Script; errors: ParseError[] } {
   const lexed: TokenizeResult = tokenize(source)
-  return new Parser(lexed.tokens, lexed.errors).parse()
+  return new Parser(lexed.tokens, lexed.errors, source).parse()
 }

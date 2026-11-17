@@ -5,6 +5,7 @@ import type { Command, Expr, Pipeline, Script, Statement } from './ast'
 import { bind, resolveParameter, type RawItem } from './binder'
 import { coreCmdlets } from './cmdlets/core'
 import { utilityCmdlets } from './cmdlets/utility'
+import { adCmdlets } from './cmdlets/ad'
 import { formatValues } from './format'
 import { parse } from './parser'
 import { Registry, type CmdletSpec, type Invocation } from './registry'
@@ -392,7 +393,7 @@ export function createRuntime(options: RuntimeOptions): Runtime {
 
 /** A registry with the discovery cmdlets of this slice. Later tasks register more modules on it. */
 export function createDefaultRegistry(): Registry {
-  return new Registry().register(...coreCmdlets, ...utilityCmdlets)
+  return new Registry().register(...coreCmdlets, ...utilityCmdlets, ...adCmdlets)
 }
 
 /**

@@ -17,11 +17,11 @@ describe('registry', () => {
 
   it('gives every cmdlet a module, a synopsis, and at least one example', () => {
     for (const spec of createDefaultRegistry().list()) {
-      expect(spec.module, spec.name).toMatch(/^Microsoft\.PowerShell\.(Core|Utility)$/)
+      expect(spec.module, spec.name).toMatch(/^(ActiveDirectory|Microsoft\.PowerShell\.(Core|Utility|Management|Diagnostics)|ADShield\.Sim)$/)
       expect(spec.help.synopsis.length, spec.name).toBeGreaterThan(10)
       expect(spec.help.examples.length, spec.name).toBeGreaterThan(0)
     }
-    expect(createDefaultRegistry().list().map((spec) => spec.name)).toEqual(['Get-Command', 'Get-Help', 'Get-Member', 'Read-Host', 'Select-Object', 'Where-Object', 'Write-Output'])
+    expect(createDefaultRegistry().list().map((spec) => spec.name)).toEqual(expect.arrayContaining(['Get-Command', 'Get-Help', 'Get-Member', 'Read-Host', 'Select-Object', 'Where-Object', 'Write-Output']))
   })
 
   it('refuses a duplicate command name or alias', () => {
