@@ -35,6 +35,28 @@ describe('ActiveDirectory read cmdlets', () => {
     const bareBlock = run("Get-ADUser -Filter { Department -eq 'Pharmacy' }", rt)
     expect(bareBlock.errors).toEqual([])
     expect(bareBlock.values.map((v) => (v as unknown as { ref: string }).ref)).toEqual(quoted.values.map((v) => (v as unknown as { ref: string }).ref))
+    expect(quoted.values.length).toBeGreaterThan(0)
+    const colonBlock = run("Get-ADUser -Filter:{ Department -eq 'Pharmacy' }", rt)
+    expect(colonBlock.errors).toEqual([])
+    expect(colonBlock.values.map((v) => (v as unknown as { ref: string }).ref)).toEqual(quoted.values.map((v) => (v as unknown as { ref: string }).ref))
+  })
+
+  it('matches the documented compound script-block filter against the single-quoted form', () => {
+    const { rt } = lab()
+    const refs = (r: { values: unknown[] }) => r.values.map((v) => (v as { ref: string }).ref)
+    const quoted = run("Get-ADUser -Filter 'Name -like \"M*\" -and Enabled -eq $true'", rt)
+    const block = run("Get-ADUser -Filter { Name -like 'M*' -and Enabled -eq $true }", rt)
+    expect(quoted.errors).toEqual([])
+    expect(block.errors).toEqual([])
+    expect(refs(quoted).length).toBeGreaterThan(0)
+    expect(refs(block)).toEqual(refs(quoted))
+  })
+
+  it('keeps a closing brace inside a quoted filter value as data', () => {
+    const { rt } = lab()
+    const result = run("Get-ADUser -Filter { Name -eq 'a}b' }", rt)
+    expect(result.errors).toEqual([])
+    expect(result.values).toEqual([])
 
     const multiQuoted = run("Get-ADUser -Filter 'Name -like ''M*'' -and Enabled -eq $true'", rt)
     const multiBlock = run("Get-ADUser -Filter { Name -like 'M*' -and Enabled -eq $true }", rt)
