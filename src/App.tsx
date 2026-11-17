@@ -12,6 +12,8 @@ import Hints from './ui/hints/Hints'
 import Checklist, { progressText } from './ui/criteria/Checklist'
 import Debrief from './ui/debrief/Debrief'
 import Inbox from './ui/inbox/Inbox'
+import DirectoryPanel from './ui/directory/DirectoryPanel'
+import EvidencePanel from './ui/log/EvidencePanel'
 
 const NARROW_TABS = ['Ticket', 'PowerShell', 'Directory', 'Evidence'] as const
 
@@ -84,7 +86,7 @@ export default function App() {
 
   return <>
     <Workspace
-      slots={{ top, left, upper: <div className="work-card placeholder">Directory view is built in T07.</div>, lower: <Terminal ref={terminalRef} /> }}
+      slots={{ top, left, upper: <DirectoryPanel />, lower: <Terminal ref={terminalRef} />, evidence: <EvidencePanel /> }}
       tab={ui.tab}
       onTab={(tab: WorkTab) => actions.setTab(tab)}
       evidenceCount={active?.state.events.length ?? 0}

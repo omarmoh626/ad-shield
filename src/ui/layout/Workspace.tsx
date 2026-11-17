@@ -2,13 +2,14 @@ import type { ReactNode } from 'react'
 
 /**
  * Region slots (D1). `top` is the header, `left` the Work screen's left rail,
- * `upper` the Directory tab (T07 fills it), `lower` the PowerShell tab.
+ * `upper` the Directory tab, `lower` the PowerShell tab, `evidence` the Evidence tab (T07).
  */
 export interface WorkspaceSlots {
   top: ReactNode
   left: ReactNode
   upper: ReactNode
   lower: ReactNode
+  evidence?: ReactNode
 }
 
 export type WorkTab = 'PowerShell' | 'Directory' | 'Evidence'
@@ -53,7 +54,7 @@ export default function Workspace({ slots, tab, onTab, evidenceCount, view }: Wo
         <section id="panel-PowerShell" role="tabpanel" aria-labelledby="tab-PowerShell" data-region="lower" hidden={tab !== 'PowerShell'}>{slots.lower}</section>
         <section id="panel-Directory" role="tabpanel" aria-labelledby="tab-Directory" data-region="upper" hidden={tab !== 'Directory'}>{slots.upper}</section>
         <section id="panel-Evidence" role="tabpanel" aria-labelledby="tab-Evidence" hidden={tab !== 'Evidence'}>
-          <div className="work-card placeholder">Evidence view is built in T07.</div>
+          {slots.evidence}
         </section>
       </main>
     </div>

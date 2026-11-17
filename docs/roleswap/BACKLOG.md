@@ -31,3 +31,15 @@ Add items here as tasks T01 to T10 defer them: nits from audits, bugs too large 
 - **T03 D9, `-ChangePasswordAtLogon`.** Sign-in must honor the `changePasswordAtLogon` attribute that T03 stores instead of `pwdLastSet = 0`. Consider mapping it to `pwdLastSet = 0` in the engine. Scheduled for T04 P2.
 - **Tests in a read-only sandbox (from T04 P2 audit).** Make `npm test` runnable when `node_modules` is read-only, for example with Vite's runner config loader (`--configLoader runner`) so Vitest does not write `node_modules/.vite-temp`. Codex can then run the test checks during reviews.
 - **npm audit recheck (T06 D10).** At the start of every task, run `npm audit`. The 6 high warnings come from one advisory, picomatch GHSA-fc5q-39xc-vjpf (ReDoS, no patched release as of 2026-11-17), pulled in by vite, vitest, tinyglobby, fdir, and @vitejs/plugin-react. Upgrade as soon as a patched picomatch or a vite/vitest release without it ships, without downgrading a major version. Then remove the `--host` warning from `docs/SUPPORT.md`.
+
+## Revision phase (after T10)
+
+Omar added these on 2026-11-17, during T07. Do them after T10, before Tier 2.
+
+- **Beginner help.** A "New to PowerShell?" guided mode on the first case; starter command buttons in the empty console; **Try it** buttons on `Get-Help` examples; a one-line plain explanation under every command's output.
+- **PowerShell glossary.** A reference page of every supported cmdlet with its purpose in plain words, common parameters, and a runnable example.
+- **Bug: multi-line paste.** Pasting several lines into the console joins them into one command. Run each line in order, or offer the Script pad.
+- **Bug: Progress panel.** The Progress panel pushes the page down. Make it a popover under the button that closes on Esc or an outside click.
+- **Bug: checklist detail text.** The detail text shows internals ("sequence 14"). Use plain words.
+- **Ticket chip.** The chip shows `case01`. Use ticket numbers such as `INC-01`.
+- **Testing.** Omar plays every case by hand. Three AI testers run every case and report bugs and confusing spots.

@@ -1,10 +1,13 @@
 import { useSyncExternalStore } from 'react'
 import { OPERATOR_ID, buildBaseDomain } from '../fixtures/baseDomain'
-import { applyAttemptAction, closeTicket, createCampaign, introduceTicket, resetAttempt, startReplay } from '../tickets/engine'
+import { applyAttemptAction, closeTicket, createCampaign, introduceTicket, recordCommittedAction, resetAttempt, startReplay } from '../tickets/engine'
 import { case01 } from '../tickets/cases/case01'
 import { TICKETS, getTicket } from '../tickets/cases'
 import type { Attempt, CampaignState, CaseFixture } from '../tickets/types'
 import { PersistSession, browserStorage, browserWriterLock, fullSlaMs as fullSlaFor } from '../persist'
+import { dispatch } from '../engine/dispatch'
+import type { Action, ActionResult } from '../engine/types'
+import type { Guid } from '../domain/types'
 
 export interface DebriefView {
   attempt: Attempt
@@ -33,6 +36,7 @@ export interface UiState {
   closeRefusal?: string[]
   /** Bumped to ask the mounted console for focus after the next render (it is hidden until then). */
   focusRequest: number
+  selectedObject: Guid | null
 }
 
 /** Saves the SLA countdown every this many real seconds while it runs (D4). */
@@ -52,7 +56,7 @@ const saveStatusText = () => ({ saved: 'Saved', saving: 'Saving…', notSaved: '
 const fixtureFor = (attempt: Attempt): CaseFixture | undefined => getTicket(attempt.id)?.build(attempt.seed)
 
 // D7: the app opens on the active case's Read screen with the console mounted behind it; with no active case, on the inbox.
-let state: UiState = { campaign, screen: campaign.active ? 'Read' : 'Inbox', tab: 'PowerShell', draft: '', paused: false, sla: slaFrom(campaign), saveStatus: saveStatusText(), notices: loaded.notices.map((notice) => notice.message), toast: '', railOpen: false, focusRequest: 0 }
+let state: UiState = { campaign, screen: campaign.active ? 'Read' : 'Inbox', tab: 'PowerShell', draft: '', paused: false, sla: slaFrom(campaign), saveStatus: saveStatusText(), notices: loaded.notices.map((notice) => notice.message), toast: '', railOpen: false, focusRequest: 0, selectedObject: null }
 let ticksSinceSave = 0
 const listeners = new Set<() => void>()
 const publish = (next: UiState) => { state = next; listeners.forEach((listener) => listener()) }
@@ -120,8 +124,19 @@ export const actions = {
 
   // T06 P2 actions (D6). Each one goes through the ticket engine.
   /** Opens the Work screen on the PowerShell tab and focuses the console. */
-  startInvestigating() {
-    publish({ ...state, screen: 'Work', tab: 'PowerShell', preview: undefined, focusRequest: state.focusRequest + 1 })
+  startInvestigating(tab: 'PowerShell' | 'Directory' = 'PowerShell') {
+    publish({ ...state, screen: 'Work', tab, preview: undefined, focusRequest: tab === 'PowerShell' ? state.focusRequest + 1 : state.focusRequest })
+  },
+  setSelectedObject(selectedObject: Guid | null) { publish({ ...state, selectedObject }) },
+  /** Dispatches a GUI action through the shared pipeline and returns its result unchanged. */
+  dispatchGui(action: Action, baseRevision: number): ActionResult {
+    const attempt = state.campaign.active
+    const fixture = attempt && fixtureFor(attempt)
+    // Without an open case there is nowhere to keep a change, so nothing is dispatched.
+    if (!attempt || !fixture) return { ok: false, state: attempt?.state ?? state.campaign.base, events: [], diff: [], warnings: [], error: 'invalid', message: 'No case is open. Pick one from the inbox.' }
+    const result = dispatch(attempt.state, action, { actor: operatorGuid, source: 'gui', whatIf: false, baseRevision })
+    if (result.ok && result.state !== attempt.state) actions.setCampaign(recordCommittedAction(state.campaign, fixture, action, result, 'gui'))
+    return result
   },
   /** Shows a queued case's ticket in read-only mode. It never changes campaign state. */
   openPreview(ticketId: string) { publish({ ...state, screen: 'Read', preview: ticketId }) },
@@ -182,6 +197,6 @@ export const getStore = () => state
 /** Test helper: a fresh case 01 attempt on the Work screen. */
 export function resetStore() {
   campaign = introduceTicket(createCampaign(base.state, ['case01']), case01, 1)
-  publish({ campaign, screen: 'Work', tab: 'PowerShell', draft: '', paused: false, sla: slaFrom(campaign), saveStatus: saveStatusText(), notices: [], toast: '', railOpen: false, focusRequest: 0 })
+  publish({ campaign, screen: 'Work', tab: 'PowerShell', draft: '', paused: false, sla: slaFrom(campaign), saveStatus: saveStatusText(), notices: [], toast: '', railOpen: false, focusRequest: 0, selectedObject: null })
   persistence.save(campaign)
 }
