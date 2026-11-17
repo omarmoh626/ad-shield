@@ -78,7 +78,7 @@ describe('debrief', () => {
     expect(replay.replay).toBe(true)
     expect(replay.seed).not.toBe(1)
     expect(getStore().screen).toBe('Read')
-    await user.click(screen.getByRole('button', { name: 'Start investigating' }))
+    await user.click(screen.getByRole('button', { name: 'Start in PowerShell' }))
     expect(screen.getByRole('button', { name: 'Show hint 1 of 3' })).toBeVisible()
     await solveWithTerminal(user)
     const debrief = await finish(user)

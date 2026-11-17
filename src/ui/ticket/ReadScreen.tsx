@@ -40,6 +40,6 @@ export default function ReadScreen({ fixture, readOnly = false }: ReadScreenProp
     <Feed messages={messages} segments={feedSegments} />
     {readOnly
       ? <button type="button" onClick={() => actions.setScreen('Inbox')}>Back to inbox</button>
-      : <div className="start"><button type="button" className="primary" onClick={() => actions.startInvestigating()}>Start investigating</button><p className="muted">Stuck? Hints open one level at a time, whenever you want.</p></div>}
+      : <div className="start"><button type="button" className="primary" onClick={() => actions.startInvestigating('PowerShell')}>Start in PowerShell</button><button type="button" onClick={() => actions.startInvestigating('Directory')}>Start in Directory</button><p className="muted">Stuck? Hints open one level at a time, whenever you want.</p></div>}
   </article>
 }

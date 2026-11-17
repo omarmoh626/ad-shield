@@ -5,12 +5,19 @@ import { labTime } from '../debrief/timeline'
 import { displayName, groupKind, signInName, statusLabel, typeLabel } from '../directory/labels'
 
 const TABS = ['General', 'Account', 'Groups'] as const
-type PropertiesTab = typeof TABS[number]
+export type PropertiesTab = typeof TABS[number]
 const ACCOUNT_CLASSES = new Set(['user', 'computer', 'serviceAccount'])
 
 export interface ObjectPropertiesProps {
   state: DomainState
   guid: Guid | null
+  /** Controlled tab (T07 P2: menu items open a tab). Uncontrolled when omitted. */
+  tab?: PropertiesTab
+  onTab?(tab: PropertiesTab): void
+  /** Shown beside the object's name, for example the Actions menu button. */
+  header?: ReactNode
+  /** Editors for the open tab, shown under its read-only values. */
+  editors?(tab: PropertiesTab): ReactNode
 }
 
 /** Primary group: the group whose SID ends with the object's primaryGroupID RID. It is not a membership row (CONTRACTS s4). */
@@ -50,13 +57,14 @@ function Account({ object }: { object: DirObject }) {
   if (!ACCOUNT_CLASSES.has(object.objectClass)) return <p className="muted">This {typeLabel(object)} has no sign-in account.</p>
   const a = object.attrs
   const locked = a.lockedOut === true
-  const mustChange = a.pwdLastSet === 0
+  // Sign-in honors both (src/access/sessions.ts): the flag Set-ADUser writes, and pwdLastSet 0.
+  const mustChange = a.changePasswordAtLogon === true || a.pwdLastSet === 0
   return <dl className="props">
     <Row label="Status">{statusLabel(object)}</Row>
     <Row label="Account turned on">{a.enabled === false ? 'No' : 'Yes'} (<code>Enabled {a.enabled === false ? 'False' : 'True'}</code>)</Row>
     <Row label="Locked out">{locked ? 'Yes' : 'No'} (<code>LockedOut {locked ? 'True' : 'False'}</code>)</Row>
     {typeof a.badPwdCount === 'number' && <Row label="Wrong passwords in a row">{a.badPwdCount}</Row>}
-    {typeof a.pwdLastSet === 'number' && <Row label="Password last set">{mustChange ? 'Never' : `${labTime(a.pwdLastSet)} lab time`}</Row>}
+    {typeof a.pwdLastSet === 'number' && <Row label="Password last set">{a.pwdLastSet === 0 ? 'Never' : `${labTime(a.pwdLastSet)} lab time`}</Row>}
     <Row label="Must change password at next sign-in">{mustChange ? 'Yes' : 'No'}</Row>
     {text(a.userPrincipalName) && <Row label="Sign-in name (UPN)" mono>{text(a.userPrincipalName)}</Row>}
     {signInName(object) && <Row label="Pre-Windows 2000 name" mono>{signInName(object)}</Row>}
@@ -76,8 +84,10 @@ function Groups({ state, object }: { state: DomainState; object: DirObject }) {
 }
 
 /** Read-only properties for the selected object (T07 P1). P2 adds the editors below these tabs. */
-export default function ObjectProperties({ state, guid }: ObjectPropertiesProps) {
-  const [tab, setTab] = useState<PropertiesTab>('General')
+export default function ObjectProperties({ state, guid, tab: controlled, onTab, header, editors }: ObjectPropertiesProps) {
+  const [own, setOwn] = useState<PropertiesTab>('General')
+  const tab = controlled ?? own
+  const setTab = (next: PropertiesTab) => { setOwn(next); onTab?.(next) }
   const object = guid ? state.objects[guid] : undefined
   if (!object) return <div className="props-empty muted">Pick an object in the tree to see its properties.</div>
   const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -91,7 +101,7 @@ export default function ObjectProperties({ state, guid }: ObjectPropertiesProps)
   }
   const sam = signInName(object)
   return <section className="properties" aria-label={`Properties of ${displayName(object)}`}>
-    <h2 className="props-title">{displayName(object)}</h2>
+    <div className="props-head"><h2 className="props-title">{displayName(object)}</h2>{header}</div>
     <p className="meta"><span className="pill">{typeLabel(object)}</span>{statusLabel(object) && <span className="pill">{statusLabel(object)}</span>}{sam && <span className="mono">{sam}</span>}</p>
     <div className="tabs" role="tablist" aria-label="Properties" onKeyDown={onKey}>
       {TABS.map((name) => <button
@@ -109,6 +119,7 @@ export default function ObjectProperties({ state, guid }: ObjectPropertiesProps)
       {tab === 'General' && <General state={state} object={object} />}
       {tab === 'Account' && <Account object={object} />}
       {tab === 'Groups' && <Groups state={state} object={object} />}
+      {editors?.(tab)}
     </div>
   </section>
 }

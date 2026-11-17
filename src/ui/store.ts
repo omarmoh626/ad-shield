@@ -7,12 +7,30 @@ import type { Attempt, CampaignState, CaseFixture } from '../tickets/types'
 import { PersistSession, browserStorage, browserWriterLock, fullSlaMs as fullSlaFor } from '../persist'
 import { dispatch } from '../engine/dispatch'
 import type { Action, ActionResult } from '../engine/types'
-import type { Guid } from '../domain/types'
+import type { DirObject, DomainState, Guid } from '../domain/types'
 
 export interface DebriefView {
   attempt: Attempt
   /** First completion of this case. A replay or a repeat never counts (CONTRACTS s9). */
   firstTime: boolean
+}
+
+/**
+ * One open GUI form (T07 P2): the revision and object snapshot it opened against, the learner's
+ * draft, and the last apply outcome. It lives in the store so it survives tab switches. Password
+ * characters never enter it; password fields are uncontrolled and keep only a policy verdict.
+ */
+export interface GuiForm {
+  baseRevision: number
+  snapshot?: DirObject
+  /** Sorted direct group GUIDs of the object when the form opened. */
+  groups: string
+  /** The whole domain state the form opened against (an immutable reference, never saved). Stale details compare touched objects with it. */
+  opened?: DomainState
+  /** Actions (as JSON) this draft already committed in a partial apply. Apply never sends them again. */
+  committed?: string[]
+  draft?: unknown
+  outcome?: unknown
 }
 
 export interface UiState {
@@ -37,6 +55,8 @@ export interface UiState {
   /** Bumped to ask the mounted console for focus after the next render (it is hidden until then). */
   focusRequest: number
   selectedObject: Guid | null
+  /** Open GUI forms by `editor:guid` (T07 D8). Cleared on a new case, a reset, or a new selection. */
+  forms: Record<string, GuiForm>
 }
 
 /** Saves the SLA countdown every this many real seconds while it runs (D4). */
@@ -56,7 +76,7 @@ const saveStatusText = () => ({ saved: 'Saved', saving: 'Saving…', notSaved: '
 const fixtureFor = (attempt: Attempt): CaseFixture | undefined => getTicket(attempt.id)?.build(attempt.seed)
 
 // D7: the app opens on the active case's Read screen with the console mounted behind it; with no active case, on the inbox.
-let state: UiState = { campaign, screen: campaign.active ? 'Read' : 'Inbox', tab: 'PowerShell', draft: '', paused: false, sla: slaFrom(campaign), saveStatus: saveStatusText(), notices: loaded.notices.map((notice) => notice.message), toast: '', railOpen: false, focusRequest: 0, selectedObject: null }
+let state: UiState = { campaign, screen: campaign.active ? 'Read' : 'Inbox', tab: 'PowerShell', draft: '', paused: false, sla: slaFrom(campaign), saveStatus: saveStatusText(), notices: loaded.notices.map((notice) => notice.message), toast: '', railOpen: false, focusRequest: 0, selectedObject: null, forms: {} }
 let ticksSinceSave = 0
 const listeners = new Set<() => void>()
 const publish = (next: UiState) => { state = next; listeners.forEach((listener) => listener()) }
@@ -82,8 +102,8 @@ export const actions = {
     const key = caseKey(value)
     const sla = key === state.sla.caseKey ? state.sla : { caseKey: key, remainingMs: fullSlaMs(value) }
     const next = { ...value, slaRemainingMs: sla.remainingMs }
-    // Any campaign change makes an earlier close refusal stale.
-    publish({ ...state, campaign: next, sla, closeRefusal: undefined })
+    // Any campaign change makes an earlier close refusal stale. A new case closes every open GUI form.
+    publish({ ...state, campaign: next, sla, closeRefusal: undefined, ...(key === state.sla.caseKey ? {} : { forms: {} }) })
     persistence.save(next)
     ticksSinceSave = 0
     updateStatus()
@@ -127,7 +147,28 @@ export const actions = {
   startInvestigating(tab: 'PowerShell' | 'Directory' = 'PowerShell') {
     publish({ ...state, screen: 'Work', tab, preview: undefined, focusRequest: tab === 'PowerShell' ? state.focusRequest + 1 : state.focusRequest })
   },
-  setSelectedObject(selectedObject: Guid | null) { publish({ ...state, selectedObject }) },
+  /** Selecting another object closes the forms of the previous one, like closing a properties dialog. */
+  setSelectedObject(selectedObject: Guid | null) {
+    const forms = Object.fromEntries(Object.entries(state.forms).filter(([key]) => selectedObject !== null && key.endsWith(`:${selectedObject}`)))
+    publish({ ...state, selectedObject, forms })
+  },
+  /** Opens a GUI form against the current revision, once. An open form keeps its base revision. */
+  openForm(key: string, guid: Guid | null) {
+    if (state.forms[key]) return
+    const domain = state.campaign.active?.state
+    if (!domain) return
+    const groups = guid ? [...(domain.indexes.groupsByMember[guid] ?? [])].sort().join(',') : ''
+    publish({ ...state, forms: { ...state.forms, [key]: { baseRevision: domain.revision, snapshot: guid ? domain.objects[guid] : undefined, groups, opened: domain } } })
+  },
+  updateForm(key: string, patch: Partial<GuiForm>) {
+    const form = state.forms[key]
+    if (form) publish({ ...state, forms: { ...state.forms, [key]: { ...form, ...patch } } })
+  },
+  closeForm(key: string) {
+    if (!(key in state.forms)) return
+    const { [key]: _closed, ...forms } = state.forms
+    publish({ ...state, forms })
+  },
   /** Dispatches a GUI action through the shared pipeline and returns its result unchanged. */
   dispatchGui(action: Action, baseRevision: number): ActionResult {
     const attempt = state.campaign.active
@@ -170,6 +211,8 @@ export const actions = {
     const fixture = attempt && fixtureFor(attempt)
     if (!attempt || !fixture) return
     actions.setCampaign(resetAttempt(state.campaign, fixture))
+    // The revision goes back to the checkpoint, so open forms would never detect a conflict.
+    publish({ ...state, forms: {} })
     actions.toast('Attempt reset · the case is back where it started')
   },
   /** Opens the next queued case that is not complete, or the inbox when none is waiting. */
@@ -197,6 +240,6 @@ export const getStore = () => state
 /** Test helper: a fresh case 01 attempt on the Work screen. */
 export function resetStore() {
   campaign = introduceTicket(createCampaign(base.state, ['case01']), case01, 1)
-  publish({ campaign, screen: 'Work', tab: 'PowerShell', draft: '', paused: false, sla: slaFrom(campaign), saveStatus: saveStatusText(), notices: [], toast: '', railOpen: false, focusRequest: 0, selectedObject: null })
+  publish({ campaign, screen: 'Work', tab: 'PowerShell', draft: '', paused: false, sla: slaFrom(campaign), saveStatus: saveStatusText(), notices: [], toast: '', railOpen: false, focusRequest: 0, selectedObject: null, forms: {} })
   persistence.save(campaign)
 }

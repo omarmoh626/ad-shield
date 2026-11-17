@@ -19,8 +19,8 @@ const ATTRIBUTE_PARAMS: Record<string, string> = {
   UserPrincipalName: 'userPrincipalName',
 }
 
-const attributeParams: ParameterSpec[] = Object.keys(ATTRIBUTE_PARAMS).map((name) => ({ name, type: 'string' as const }))
-const changeAtLogon: ParameterSpec = { name: 'ChangePasswordAtLogon', type: 'bool', help: 'With $true the user must choose a new password at the next simulated sign-in.' }
+const attributeParams: ParameterSpec[] = Object.entries(ATTRIBUTE_PARAMS).map(([name, attribute]) => ({ name, type: 'string' as const, attribute }))
+const changeAtLogon: ParameterSpec = { name: 'ChangePasswordAtLogon', type: 'bool', attribute: 'changePasswordAtLogon', help: 'With $true the user must choose a new password at the next simulated sign-in.' }
 
 function attributesFrom(inv: Invocation): Record<string, AttrValue> {
   const attrs: Record<string, AttrValue> = {}

@@ -109,6 +109,6 @@ export default Terminal
 function getCampaign() { return getStore().campaign }
 
 /** Simplified lab password policy (docs/SUPPORT.md): 12+ characters with upper case, lower case, and a digit. */
-function passwordVerdict(value: string): 'pass' | 'fail' {
+export function passwordVerdict(value: string): 'pass' | 'fail' {
   return value.length >= 12 && /[A-Z]/.test(value) && /[a-z]/.test(value) && /\d/.test(value) ? 'pass' : 'fail'
 }

@@ -34,7 +34,7 @@ export default function App() {
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
-  // Focus the console once it is visible (Start investigating).
+  // Focus the console once it is visible (Start in PowerShell; Start in Directory leaves focus alone, D2).
   useEffect(() => { if (ui.focusRequest > 0) actions.terminal.focus() }, [ui.focusRequest])
   const terminalRef = useCallback((instance: TerminalHandle | null) => { actions.terminal.register(instance ?? undefined) }, [])
 

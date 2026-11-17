@@ -4,8 +4,8 @@ The AD Shield console is a simulated PowerShell subset. It runs in the browser. 
 
 ## Design choices
 
-- T06 P1 uses the approved blue-gray slate tokens from `docs/roleswap/DESIGN.md` section 2. The workspace exposes PowerShell, Directory, and Evidence tabs; Directory and Evidence remain placeholders until their implementation phase.
-- The app opens on the active case's Read screen with the console already mounted behind it (D7). **Start investigating** shows the Work screen and focuses the console. With no active case, the app opens on the inbox.
+- T06 P1 uses the approved blue-gray slate tokens from `docs/roleswap/DESIGN.md` section 2. The workspace exposes PowerShell, Directory, and Evidence tabs. T07 fills Directory (tree, properties, editors) and Evidence (audit log, access inspector, before and after, attempt timeline).
+- The app opens on the active case's Read screen with the console already mounted behind it (D7). **Start in PowerShell** shows the Work screen on the PowerShell tab and focuses the console. **Start in Directory** shows it on the Directory tab (T07 D2; these two buttons replace **Start investigating**). With no active case, the app opens on the inbox.
 - Hints start closed for every ticket and open one level at a time. Level 3 runs one script line only when the learner asks, then shows a plain-language explanation of that line's output. Hints never run anything by themselves.
 - **Finish case** stays disabled while any check is unmet and names the unmet checks. Closing always goes through the ticket engine; when it refuses, the checklist shows each unmet check with its observed and required values.
 - The debrief builds its "what changed" list from the attempt's action history, never from canned text. The cheat sheet collects debrief commands from every closed case and survives **Reset this attempt**.
@@ -14,6 +14,12 @@ The AD Shield console is a simulated PowerShell subset. It runs in the browser. 
 - Secure input is an uncontrolled password field labelled "simulated". The characters never enter React state. The terminal computes a password-policy verdict, queues it, clears the field, and replays the run. The characters never reach the draft, history, transcript, or saved data.
 - Simplified password policy for secure input: at least 12 characters with an upper-case letter, a lower-case letter, and a digit. The terminal checks it; the domain stores the verdict and a new credential version only.
 - The SLA countdown is a real timer in the browser (D4). Pause stops it. It never moves lab time, writes an audit event, or changes the state revision. Lab time moves only through **Advance lab time** (a recorded `clock.advance` action) or actions a case defines.
+- T07: the Directory and Evidence tabs render only while visible, so hidden panels add nothing to the keyboard tab order. The selected object and every open GUI form (its base revision, object snapshot, draft, and last result) live in the store, so a tab switch keeps them. Selecting another object closes the previous object's forms, like closing a properties dialog. A new case or **Reset this attempt** closes all forms.
+- T07: GUI editors save only with an explicit **Apply** (or **Create**, **Reset password**, **Add entry**, **Remove selected**). Context-menu items open an editor and preset its draft; they never apply a change by themselves. Every menu item is also a visible button in the **Quick actions** row. The menu opens with right-click, Shift+F10, the Menu key, or the **Actions** button.
+- T07: a stale GUI save is detected per object (DECISIONS D9). The form shows which attributes changed, whether the object moved or its groups changed, and keeps the draft. **Review with the new values** re-bases the form on the current state; **Discard my draft** drops it.
+- T07: after each GUI apply, **Same change in PowerShell** shows a command generated from the cmdlet registry. Running it on the state the GUI action ran against gives the same diff and the same events except `source`. Password resets and new users with a password use `Read-Host -AsSecureString` first, so the command asks for a masked simulated password.
+- T07: the password fields in the GUI are uncontrolled. Apply computes the policy verdict, clears the field, and sends only the verdict. The characters never reach React state, the store, a draft, a saved campaign, or the page.
+- T07: the access inspector evaluates a fresh simulated sign-in from current state. It models the share layer and the file (NTFS) layer of each simulated share; directory object permissions and Entra access are not modeled.
 - Region slots follow D1: the header is `top`, the Work screen's left rail is `left`, the Directory tab is `upper`, and the PowerShell tab is `lower`. The four-region layout from the spec became a Read screen plus a tabbed Work screen (DESIGN.md section 9).
 
 ## Modules and cmdlets
@@ -168,6 +174,13 @@ These behaviors differ from Windows PowerShell on purpose.
 - **`Reset-SimAttempt`.** The cmdlet restores the case checkpoint with the same ticket-engine reset that the GUI uses. It is not a directory action, so it writes no audit event. The console returns the restored domain state, and the attempt's action log starts empty again.
 - **Case 01 setup.** The lockout is produced by five simulated bad-password sign-ins at the user's workstation, through the normal sign-in handler. The simulated lockout threshold is 5. The near-match coworker is created through the action pipeline when the case is introduced, so that account's creation event comes before the case checkpoint.
 - **Password reset and lockout.** A simulated password reset does not unlock the account, as in Windows Server. An unlock is a separate action (event 4767).
+
+### T07 GUI simplifications
+
+- **Simplified:** the Directory tab edits users fully. Groups, computers, and OUs offer **Move**, group membership (principals), **New user** (containers), and **Share permissions** (security principals). There is no rename, delete, or group creation in the GUI in this slice.
+- **Simplified:** GUI `Set-ADUser` and `New-ADUser` changes list attributes in the order the console binds them (named parameters in registry order, then `-Replace`), so event 4738 lists attributes in the same order from both routes.
+- **Not expressible in the console:** `session.end` has no Tier 1 cmdlet. Its console equivalent is a PowerShell comment that says so. No GUI editor produces it.
+- **Simplified:** the before and after view compares the attempt's checkpoint with the current state: objects, containers, memberships, share entries, and the lab clock.
 
 ## Saving
 

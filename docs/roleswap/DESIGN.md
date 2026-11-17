@@ -65,7 +65,7 @@ Each case moves through four steps shown in the header step bar: **Read → Inve
 | --- | --- | --- |
 | Inbox | not mocked; use the list style from v1 with v3 tokens | Landing screen and between cases |
 | Read | A | A case was just opened |
-| Work (Investigate, Fix, Verify) | B and C | After "Start investigating" |
+| Work (Investigate, Fix, Verify) | B and C | After "Start in PowerShell" or "Start in Directory" |
 | Debrief | D | After "Finish case" succeeds |
 | Narrow screens | E | Below 760px wide |
 
@@ -93,7 +93,7 @@ Centered column, max 860px wide.
 - A **Careful** card on `--warn-soft` when the case has a near-match or a control object.
 - **New words in this ticket** as a collapsed `<details>` with each term defined.
 - Messages from the requester and others (the communications feed for this case) appear below, oldest first.
-- Primary button **Start investigating** and the note "Stuck? Hints open one level at a time, whenever you want."
+- Primary button **Start in PowerShell** and secondary button **Start in Directory** (T07 D2, Omar 2026-11-17). Each opens the Work screen on that tab. Then the note "Stuck? Hints open one level at a time, whenever you want."
 
 ### Work (mockups B and C)
 

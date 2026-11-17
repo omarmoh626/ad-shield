@@ -19,11 +19,21 @@ describe('Read screen and first open', () => {
     // The console is mounted behind the ticket, so the draft and transcript are ready.
     const command = screen.getByLabelText('PowerShell command')
     expect(command).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Start investigating' }))
+    await user.click(screen.getByRole('button', { name: 'Start in PowerShell' }))
     expect(command).toBeVisible()
     expect(command).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Show hint 1 of 3' })).toBeVisible()
     expect(screen.queryByText(activeFixture().hints[0].content)).toBeNull()
+  })
+
+  it('Start in Directory opens the Work screen on the Directory tab (D2)', async () => {
+    act(() => actions.openActive())
+    const user = userEvent.setup(); render(<App />)
+    expect(screen.queryByRole('button', { name: 'Start investigating' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Start in Directory' }))
+    expect(getStore().screen).toBe('Work')
+    expect(getStore().tab).toBe('Directory')
+    expect(screen.getByRole('tree')).toBeVisible()
   })
 
   it('shows sender, priority, impact, verification evidence, needs, and the account the learner owns', () => {
@@ -58,7 +68,7 @@ describe('Read screen and first open', () => {
   it('puts "simulated" next to sign-in tests and password prompts', async () => {
     act(() => actions.openActive())
     const user = userEvent.setup(); render(<App />)
-    await user.click(screen.getByRole('button', { name: 'Start investigating' }))
+    await user.click(screen.getByRole('button', { name: 'Start in PowerShell' }))
     expect(screen.getByRole('button', { name: /Test Maya's sign-in · simulated/ })).toBeVisible()
     await type(user, "$pw = Read-Host -Prompt 'New password' -AsSecureString")
     expect(await screen.findByLabelText(/New password.*simulated/)).toHaveAttribute('type', 'password')

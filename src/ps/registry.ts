@@ -17,6 +17,8 @@ export interface ParameterSpec {
   /** Allowed values. Matching ignores case. */
   values?: string[]
   help?: string
+  /** The directory attribute this parameter sets one to one. GUI console equivalents use it (T07 D7). */
+  attribute?: string
 }
 
 export interface ParameterSet {

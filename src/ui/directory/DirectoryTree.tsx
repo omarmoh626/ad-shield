@@ -21,19 +21,33 @@ export default function DirectoryTree({ state, selected, onSelect }: DirectoryTr
   const [expanded, setExpanded] = useState<ReadonlySet<Guid>>(() => new Set(rootsOf(state).map((root) => root.guid)))
   const [cursor, setCursor] = useState<Guid | null>(selected)
   const box = useRef<HTMLDivElement>(null)
-  // A selection made elsewhere (for example a hint's GUI steps) opens its ancestors once.
+  /** A selection waiting to be scrolled into the window once its ancestors are open. */
+  const pendingReveal = useRef<Guid | null>(null)
+  // A selection made elsewhere (for example a hint's GUI steps, or a restored selection) opens
+  // its ancestors once and scrolls its row into the window.
   useEffect(() => {
     if (!selected || !state.objects[selected]) return
     const missing = ancestorsOf(state, selected).filter((guid) => !expanded.has(guid))
     if (missing.length) setExpanded(new Set([...expanded, ...missing]))
     setCursor(selected)
+    pendingReveal.current = selected
     // Only a new selection opens ancestors; later collapses stay collapsed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected])
   const rows = useMemo(() => visibleRows(state, expanded), [state, expanded])
   const { slice, onScroll, reveal } = useWindow(rows.length, TREE_ROW_HEIGHT, TREE_VIEWPORT)
+  useEffect(() => {
+    const wanted = pendingReveal.current
+    if (!wanted) return
+    const at = rows.findIndex((row) => row.guid === wanted)
+    if (at < 0) return
+    pendingReveal.current = null
+    reveal(box.current, at)
+  }, [rows, reveal])
   const active = cursor && rows.some((row) => row.guid === cursor) ? cursor : (selected ?? rows[0]?.guid ?? null)
   const index = rows.findIndex((row) => row.guid === active)
+  // aria-activedescendant must name a mounted row; an unmounted cursor is revealed on the next key.
+  const activeMounted = index >= slice.start && index < slice.end
 
   const toggle = (guid: Guid, to?: boolean) => setExpanded((current) => {
     const next = new Set(current)
@@ -50,6 +64,7 @@ export default function DirectoryTree({ state, selected, onSelect }: DirectoryTr
   const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
     const row = rows[index]
     if (!row) return
+    if (!activeMounted) reveal(box.current, index)
     const handled = () => event.preventDefault()
     switch (event.key) {
       case 'ArrowDown': handled(); moveTo(index + 1); break
@@ -76,7 +91,7 @@ export default function DirectoryTree({ state, selected, onSelect }: DirectoryTr
     role="tree"
     aria-label="Directory · corp.contoso.local · simulated"
     tabIndex={0}
-    aria-activedescendant={active ? `tree-${active}` : undefined}
+    aria-activedescendant={active && activeMounted ? `tree-${active}` : undefined}
     onKeyDown={onKey}
     onScroll={onScroll}
     style={{ height: TREE_VIEWPORT }}

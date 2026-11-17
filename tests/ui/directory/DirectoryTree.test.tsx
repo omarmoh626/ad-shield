@@ -86,6 +86,30 @@ describe('directory tree', () => {
     expect(mounted).toBeGreaterThan(0)
   })
 
+  it('scrolls a deep selection into the window and points aria-activedescendant at a mounted row (audit F3)', () => {
+    let state: DomainState = buildBaseDomain().state
+    const ou = Object.values(state.objects).find((object) => object.rdn === 'Pharmacy')!.guid
+    let last: Guid | undefined
+    for (let index = 0; index < 2_000; index += 1) {
+      const created = createObject(state, { objectClass: 'user', rdn: `Load ${String(index).padStart(4, '0')}`, parent: ou, attrs: { enabled: true }, securityPrincipal: false })
+      state = created.state
+      last = created.object.guid
+    }
+    render(<DirectoryTree state={state} selected={last!} onSelect={() => {}} />)
+    const row = within(tree()).getByRole('treeitem', { name: /^Load 1999/ })
+    expect(row).toHaveAttribute('aria-selected', 'true')
+    expect(tree()).toHaveAttribute('aria-activedescendant', row.id)
+    expect(document.getElementById(tree().getAttribute('aria-activedescendant')!)).toBe(row)
+    expect(within(tree()).getAllByRole('treeitem').length).toBeLessThan(60)
+  })
+
+  it('never names an unmounted row as the active descendant', () => {
+    const state = getStore().campaign.active!.state
+    render(<DirectoryTree state={state} selected={null} onSelect={() => {}} />)
+    const id = tree().getAttribute('aria-activedescendant')
+    expect(id && document.getElementById(id)).toBeTruthy()
+  })
+
   it('windowSlice covers the viewport plus a small buffer and pads the rest', () => {
     const slice = windowSlice(2_000, 34, 476, 34 * 1_000)
     expect(slice.start).toBe(994)

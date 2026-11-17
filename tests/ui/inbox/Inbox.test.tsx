@@ -24,7 +24,7 @@ describe('inbox', () => {
     await user.click(inbox.getByRole('button', { name: /Preview case01 · read-only/ }))
     const preview = screen.getByRole('article', { name: case01.build(1).request.title })
     expect(within(preview).getByRole('note')).toHaveTextContent(/read-only/)
-    expect(within(preview).queryByRole('button', { name: 'Start investigating' })).toBeNull()
+    expect(within(preview).queryByRole('button', { name: /^Start in/ })).toBeNull()
     // Opening terms and reading changes nothing.
     for (const term of within(preview).queryAllByRole('button', { expanded: false })) await user.click(term)
     await user.click(within(preview).getByRole('button', { name: 'Back to inbox' }))
