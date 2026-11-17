@@ -239,6 +239,7 @@ interface CampaignState {
   completed: string[];
   active?: Attempt;
   history: Attempt[];
+  slaRemainingMs?: number;         // T06 D4: UI-only countdown for the active case; not domain time
 }
 
 // src/tickets/routes.ts (D4: moved out of engine.ts so the runtime -> engine import has no cycle)

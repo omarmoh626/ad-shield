@@ -1,5 +1,5 @@
 export { SAVE_KEY, BACKUP_KEY, SCHEMA_VERSION, validatePayload, type SavePayload, type SavedAttempt, type SavedEntry } from './schema'
 export { browserStorage, memoryStorage, browserWriterLock, fakeLockManager, WRITER_LOCK_NAME, type StorageLike, type WriterLock, type WriterLockHandlers } from './storage'
 export { migrate, MIGRATIONS, type Migration } from './migrate'
-export { encodeCampaign, decodeCampaign, type TicketLookup } from './codec'
+export { encodeCampaign, decodeCampaign, fullSlaMs, type TicketLookup } from './codec'
 export { PersistSession, type SaveStatus, type SaveNotice, type NoticeKind, type PersistOptions, type LoadResult } from './session'

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import Terminal, { type TerminalHandle } from './ui/terminal/Terminal'
 import Workspace, { type WorkTab } from './ui/layout/Workspace'
 import Topbar from './ui/topbar/Topbar'
@@ -6,6 +6,12 @@ import ToastRegion from './ui/toast/ToastRegion'
 import { actions, useStore } from './ui/store'
 import { scoreCampaign } from './tickets/scoring'
 import { TICKETS, getTicket } from './tickets/cases'
+import ReadScreen from './ui/ticket/ReadScreen'
+import ResetAttempt from './ui/ticket/ResetAttempt'
+import Hints from './ui/hints/Hints'
+import Checklist, { progressText } from './ui/criteria/Checklist'
+import Debrief from './ui/debrief/Debrief'
+import Inbox from './ui/inbox/Inbox'
 
 const NARROW_TABS = ['Ticket', 'PowerShell', 'Directory', 'Evidence'] as const
 
@@ -26,6 +32,8 @@ export default function App() {
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
+  // Focus the console once it is visible (Start investigating).
+  useEffect(() => { if (ui.focusRequest > 0) actions.terminal.focus() }, [ui.focusRequest])
   const terminalRef = useCallback((instance: TerminalHandle | null) => { actions.terminal.register(instance ?? undefined) }, [])
 
   const score = scoreCampaign(TICKETS.filter((ticket) => ui.campaign.completed.includes(ticket.id)), [...TICKETS], [...ui.campaign.history, ...(active ? [active] : [])], 0)
@@ -50,18 +58,29 @@ export default function App() {
       onPause={actions.togglePaused}
       onAdvance={() => actions.advanceTime(60_000)}
     />
+    {active && <button type="button" className="narrow-progress" aria-expanded={ui.railOpen} onClick={actions.toggleRail}>{ui.screen === 'Read' ? 'Read' : 'Work'} · {progressText(active.predicates)}</button>}
     <nav className="mobile-tabs" aria-label="Workspace tabs">
       {NARROW_TABS.map((tab) => <button key={tab} aria-pressed={narrowSelected(tab)} onClick={() => selectNarrow(tab)}>{tab}</button>)}
     </nav>
   </>
 
-  // P2 fills the left rail (goal, checklist, hints) and the Inbox, Read, and Debrief screens.
-  const left = <>
-    <div className="goal"><strong>Your goal</strong><p>{request?.goal ?? 'Open the next simulated case.'}</p></div>
-    <button onClick={() => actions.setScreen('Read')}>Re-read the ticket</button>
-  </>
-  const placeholder = (name: string) => <article className="work-card placeholder"><h1>{name}</h1><p>This screen is built in T06 Part 2.</p><button onClick={() => actions.setScreen('Work')}>Back to work</button></article>
-  const view = ui.screen === 'Work' ? undefined : placeholder(ui.screen)
+  // P2 (D6): the left rail and the Inbox, Read, and Debrief screens.
+  const left = active && fixture ? <>
+    {ui.railOpen && <span className="rail-open" hidden />}
+    <div className="goal"><strong>Your goal</strong><p>{fixture.request.goal}</p></div>
+    <Checklist attempt={active} fixture={fixture} />
+    {/* A new key per case and variant: hints start closed for every ticket. */}
+    <Hints key={`${active.id}:${active.seed}:${active.replay ? 'replay' : 'live'}`} fixture={fixture} />
+    <button type="button" className="link" onClick={actions.openActive}>Re-read the ticket</button>
+    <ResetAttempt />
+  </> : <p className="muted">No case is open. Pick one from the inbox.</p>
+  const previewTicket = ui.preview ? getTicket(ui.preview) : undefined
+  const debriefFixture = ui.debrief ? getTicket(ui.debrief.attempt.id)?.build(ui.debrief.attempt.seed) : undefined
+  let view: React.ReactNode = undefined
+  if (ui.screen === 'Inbox') view = <Inbox campaign={ui.campaign} />
+  else if (ui.screen === 'Read' && previewTicket) view = <ReadScreen fixture={previewTicket.build(previewTicket.seeds[0]!)} readOnly />
+  else if (ui.screen === 'Read') view = fixture ? <ReadScreen fixture={fixture} /> : <Inbox campaign={ui.campaign} />
+  else if (ui.screen === 'Debrief') view = ui.debrief && debriefFixture ? <Debrief view={ui.debrief} fixture={debriefFixture} campaign={ui.campaign} /> : <Inbox campaign={ui.campaign} />
 
   return <>
     <Workspace

@@ -40,7 +40,8 @@ describe('workspace top bar', () => {
 
   it('reaches every interactive control by keyboard and announces toast updates', async () => {
     const user = userEvent.setup(); render(<App />)
-    const controls = [...document.querySelectorAll<HTMLElement>('button,input,textarea,summary')]
+    // Disabled controls (Finish case with unmet checks) are out of the tab order by design.
+    const controls = [...document.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),textarea:not([disabled]),summary')]
     const reached = new Set<HTMLElement>()
     for (let index = 0; index < controls.length + 2; index += 1) {
       await user.tab()

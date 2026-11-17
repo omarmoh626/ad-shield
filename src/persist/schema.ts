@@ -15,6 +15,8 @@ export interface SavedAttempt {
   /** Lab clock when saved. Load checks that the replay reaches the same time. */
   clock: number
   log: SavedEntry[]
+  /** D8: true for a fresh-variation replay of a completed case. It can never award a completion. Absent in older saves. */
+  replay?: boolean
 }
 
 /**
@@ -26,7 +28,8 @@ export interface SavePayload {
   schema: number
   writer: { revision: number; tab: string }
   baseSeed: number
-  campaign: { queue: string[]; completed: string[]; history: SavedAttempt[] }
+  /** `slaRemainingMs` (D4) is optional: saves from before it existed load with the case's full SLA. */
+  campaign: { queue: string[]; completed: string[]; history: SavedAttempt[]; slaRemainingMs?: number }
   active: SavedAttempt | null
 }
 
@@ -36,6 +39,7 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
 
 function isSavedAttempt(value: unknown): value is SavedAttempt {
   return isObject(value) && typeof value.ticketId === 'string' && isFiniteNumber(value.seed) && isFiniteNumber(value.clock)
+    && (value.replay === undefined || typeof value.replay === 'boolean')
     && Array.isArray(value.log) && value.log.every((entry) => isObject(entry) && isObject(entry.action) && typeof entry.action.type === 'string' && (entry.source === 'console' || entry.source === 'gui'))
 }
 
@@ -48,6 +52,7 @@ export function validatePayload(value: unknown): string | undefined {
   if (!isFiniteNumber(value.baseSeed)) return 'The save has no base seed.'
   const campaign = value.campaign
   if (!isObject(campaign) || !isStringArray(campaign.queue) || !isStringArray(campaign.completed) || !Array.isArray(campaign.history) || !campaign.history.every(isSavedAttempt)) return 'The save has no valid campaign progress.'
+  if (campaign.slaRemainingMs !== undefined && !(isFiniteNumber(campaign.slaRemainingMs) && campaign.slaRemainingMs >= 0)) return 'The save has an invalid SLA countdown.'
   if (value.active !== null && !isSavedAttempt(value.active)) return 'The save has an invalid active attempt.'
   return undefined
 }

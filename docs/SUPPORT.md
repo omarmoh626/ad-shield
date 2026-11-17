@@ -5,7 +5,12 @@ The AD Shield console is a simulated PowerShell subset. It runs in the browser. 
 ## Design choices
 
 - T06 P1 uses the approved blue-gray slate tokens from `docs/roleswap/DESIGN.md` section 2. The workspace exposes PowerShell, Directory, and Evidence tabs; Directory and Evidence remain placeholders until their implementation phase.
-- The shell starts on case 01's PowerShell work area. Hints, full inbox behavior, criteria, and debrief are deferred to T06 P2.
+- The app opens on the active case's Read screen with the console already mounted behind it (D7). **Start investigating** shows the Work screen and focuses the console. With no active case, the app opens on the inbox.
+- Hints start closed for every ticket and open one level at a time. Level 3 runs one script line only when the learner asks, then shows a plain-language explanation of that line's output. Hints never run anything by themselves.
+- **Finish case** stays disabled while any check is unmet and names the unmet checks. Closing always goes through the ticket engine; when it refuses, the checklist shows each unmet check with its observed and required values.
+- The debrief builds its "what changed" list from the attempt's action history, never from canned text. The cheat sheet collects debrief commands from every closed case and survives **Reset this attempt**.
+- **Simplified:** the shift queues one new catalog case each time a case closes. Queued cases open as read-only previews and cannot change state.
+- **Simplified:** a case's full SLA is read from the minutes in its request text, for example "30 minutes (simulated)".
 - Secure input is an uncontrolled password field labelled "simulated". The characters never enter React state. The terminal computes a password-policy verdict, queues it, clears the field, and replays the run. The characters never reach the draft, history, transcript, or saved data.
 - Simplified password policy for secure input: at least 12 characters with an upper-case letter, a lower-case letter, and a digit. The terminal checks it; the domain stores the verdict and a new credential version only.
 - The SLA countdown is a real timer in the browser (D4). Pause stops it. It never moves lab time, writes an audit event, or changes the state revision. Lab time moves only through **Advance lab time** (a recorded `clock.advance` action) or actions a case defines.
@@ -108,6 +113,10 @@ The console rejects each of these with an error that gives the line and column. 
 - Common parameters other than `-WhatIf` and `-Confirm`, such as `-ErrorAction` and `-Verbose`.
 - `${name}` inside a double-quoted string. The text stays literal.
 
+## Development server
+
+- **Do not run the development server with `--host`** (or set `server.host` in the Vite config) until npm audit advisory GHSA-fc5q-39xc-vjpf is fixed. The advisory is a regular-expression denial of service in `picomatch`, a development-only dependency of Vite and Vitest, and no patched release exists yet (T06 D10). Keep `npm run dev` bound to localhost. The built app (`npm run build`) does not include `picomatch`.
+
 ## Simplified behavior
 
 - **Active Directory reads.** Identity lookup accepts sAMAccountName, distinguished name, GUID, and SID, ignoring case. Display names are rejected as identity keys. Filter text supports comparisons, wildcards, logical operators, and `*`; it is parsed as data and never evaluated as code. Inactivity search uses `lastLogonTimestamp`; accounts exactly at the cutoff match. Missing timestamps do not match.
@@ -167,4 +176,6 @@ These behaviors differ from Windows PowerShell on purpose.
 - Only one tab saves at a time. The first tab takes a browser Web Lock named `adshield-writer` and keeps it while it stays open. Any other tab opens read-only and says so. When the saving tab closes, the next tab loads the newest save and starts saving.
 - Each save also checks the save's revision number. A tab never writes over a save that is newer than the one it last loaded or wrote. If that happens, the tab becomes read-only and says so.
 - **Simplified:** in a browser without Web Locks (`navigator.locks`), the simulator shows a notice and relies on the revision check alone. Two tabs that save at almost the same moment could then both write, and the later save would win. Keep the simulator open in one tab only in that browser.
+- The save also holds the remaining SLA countdown (D4). It is saved every 10 seconds while the countdown runs, on pause, and on every committed action, so a reload can lose up to 10 seconds of countdown. A save from before this field existed loads with the active case's full SLA.
+- A fresh variation of a completed case is saved with a replay flag (D8). After a reload it is still a replay and cannot award a second completion.
 - When storage is full or blocked, the simulator shows a notice and keeps working. It shows "Not saved" until a later save succeeds.

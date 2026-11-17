@@ -6,7 +6,14 @@ import { SCHEMA_VERSION, type SavedAttempt, type SavePayload } from './schema'
 export type TicketLookup = (id: string) => TicketDef | undefined
 
 function saveAttempt(attempt: Attempt): SavedAttempt {
-  return { ticketId: attempt.id, seed: attempt.seed, clock: attempt.state.now, log: attempt.history.map(({ action, source }) => ({ action, source })) }
+  return { ticketId: attempt.id, seed: attempt.seed, clock: attempt.state.now, log: attempt.history.map(({ action, source }) => ({ action, source })), ...(attempt.replay ? { replay: true } : {}) }
+}
+
+/** D4: the full SLA of an attempt's case, from its request text such as "30 minutes (simulated)". 0 when it has none. */
+export function fullSlaMs(attempt: Pick<Attempt, 'id' | 'seed'> | undefined, lookup: TicketLookup): number {
+  const sla = attempt ? lookup(attempt.id)?.build(attempt.seed).request.sla : undefined
+  const minutes = Number(sla?.match(/\d+/)?.[0])
+  return Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : 0
 }
 
 /** Turns a campaign into a payload: seeds and action logs only, never domain state. */
@@ -15,7 +22,7 @@ export function encodeCampaign(campaign: CampaignState, baseSeed: number, writer
     schema: SCHEMA_VERSION,
     writer,
     baseSeed,
-    campaign: { queue: [...campaign.queue], completed: [...campaign.completed], history: campaign.history.map(saveAttempt) },
+    campaign: { queue: [...campaign.queue], completed: [...campaign.completed], history: campaign.history.map(saveAttempt), ...(campaign.slaRemainingMs === undefined ? {} : { slaRemainingMs: campaign.slaRemainingMs }) },
     active: campaign.active ? saveAttempt(campaign.active) : null,
   }
 }
@@ -42,5 +49,8 @@ export function decodeCampaign(payload: SavePayload, lookup: TicketLookup): Camp
   for (const id of payload.campaign.queue) if (!lookup(id)) throw new Error(`The save queues an unknown ticket ${id}.`)
   const history = payload.campaign.history.map((saved) => ({ ...replayAttempt(base, saved, lookup), completed: true }))
   const campaign: CampaignState = { ...createCampaign(base, payload.campaign.queue), completed: [...payload.campaign.completed], history }
-  return payload.active ? { ...campaign, active: replayAttempt(base, payload.active, lookup) } : campaign
+  if (!payload.active) return campaign
+  const active = { ...replayAttempt(base, payload.active, lookup), replay: payload.active.replay === true }
+  // An older save has no SLA countdown: start the active case's full SLA.
+  return { ...campaign, active, slaRemainingMs: payload.campaign.slaRemainingMs ?? fullSlaMs(active, lookup) }
 }

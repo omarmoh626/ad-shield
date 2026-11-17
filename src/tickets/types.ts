@@ -34,5 +34,9 @@ export interface Attempt { id: string; seed: number; state: DomainState; checkpo
 export interface AttemptEntry { action: Action; source: 'console' | 'gui'; revision: number; whatIf: boolean }
 export interface PredicateStatus extends PredicateResult { id: string; label: string; kind: Predicate['kind']; weight: number; posture?: Predicate['posture'] }
 export interface RouteResult extends Attempt { closed: boolean; refusal?: string[] }
-export interface CampaignState { base: DomainState; queue: string[]; completed: string[]; active?: Attempt; history: Attempt[] }
+export interface CampaignState {
+  base: DomainState; queue: string[]; completed: string[]; active?: Attempt; history: Attempt[]
+  /** D4: remaining UI-only SLA countdown for the active case, in real milliseconds. Never part of domain state. */
+  slaRemainingMs?: number
+}
 export interface Score { rank: string; posture: number; failedChecks: string[]; activeIncidentCount: number }
