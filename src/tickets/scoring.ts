@@ -2,9 +2,10 @@ import type { Attempt, Score, TicketDef } from './types'
 
 export function rankFor(completed: TicketDef[], catalog: TicketDef[]): string {
   const completedIds = new Set(completed.map((ticket) => ticket.id))
-  const tierDone = (tier: TicketDef['tier']) => catalog.filter((ticket) => ticket.tier === tier).every((ticket) => completedIds.has(ticket.id))
-  if (tierDone(1) && tierDone(2) && catalog.some((ticket) => ticket.tier === 3)) return 'Identity Security Engineer'
-  if (tierDone(1) && catalog.some((ticket) => ticket.tier === 2)) return 'IAM Analyst'
+  // D3: completing a tier promotes, whether or not the next tier is built yet (SPEC: rank moves as each tier completes; D12 stops at IAM Analyst in this slice).
+  const tierDone = (tier: TicketDef['tier']) => { const tickets = catalog.filter((ticket) => ticket.tier === tier); return tickets.length > 0 && tickets.every((ticket) => completedIds.has(ticket.id)) }
+  if (tierDone(1) && tierDone(2)) return 'Identity Security Engineer'
+  if (tierDone(1)) return 'IAM Analyst'
   return 'Helpdesk'
 }
 export function postureFor(attempts: Attempt[]): { posture: number; failedChecks: string[] } {

@@ -28,7 +28,7 @@ const unmet = (result: RouteResult) => result.predicates.filter((item) => item.s
 
 describe('case 03: new hire with a display-name collision', () => {
   it('is registered after cases 01 and 02 in the campaign queue', () => {
-    expect(TICKETS.map((ticket) => ticket.id)).toEqual(['case01', 'case02', 'case03'])
+    expect(TICKETS.map((ticket) => ticket.id).slice(0, 3)).toEqual(['case01', 'case02', 'case03'])
     expect(getTicket('case03')).toBe(case03)
   })
 

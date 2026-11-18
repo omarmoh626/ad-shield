@@ -204,3 +204,11 @@ These behaviors differ from Windows PowerShell on purpose.
 - The lab has no `Remove-ADUser` in this slice. A learner who creates a second account cannot delete it and must use `Reset-SimAttempt` to start the case again.
 - The GUI New user form has no change-at-next-sign-in box, and it uses the full name as both the name (CN) and the display name. The GUI route sets the flag afterwards on the Account tab.
 - When the initial password fails policy, `New-ADUser` still creates the account, turned off and with no credential, and reports an error. The learner recovers with `Set-ADAccountPassword -Reset` and `Enable-ADAccount` on the same account.
+
+### T09 cases 04 and 05, Tier 1 flow
+
+- Case 04 models the enterprise-wide role as a direct membership of the transferring account in `UG-All-Staff`, added when the case starts. In the base domain that group otherwise holds only role groups.
+- Case 04 grades "same account" by the fixture GUID and the SID that account had when the ticket arrived, never by name. The lab has no `Remove-ADUser`, so the "delete and recreate" wrong fix is modeled as creating a second account with the same name in Finance.
+- Case 04 creates a session for the transferring account on PHARM-WS01 before the transfer. The checklist reports its Pharmacy access for information only. A fresh sign-in is what the access checks grade.
+- Case 05 runs its test sign-in at the contractor's assigned workstation, PHARM-WS01, and expects 4625 there (DECISIONS D2 in the T09 handoff). 4740 lockouts stay on DC01.
+- Rank moves to IAM Analyst when every built Tier 1 case is complete, even though no Tier 2 case exists yet. After case 05 the inbox says Tier 2 and Tier 3 are not built yet (DECISIONS D12).

@@ -1,5 +1,5 @@
 import type { CampaignState } from '../../tickets/types'
-import { getTicket } from '../../tickets/cases'
+import { TICKETS, getTicket } from '../../tickets/cases'
 import { actions } from '../store'
 import CheatSheet, { cheatSheetFor } from '../debrief/CheatSheet'
 
@@ -18,9 +18,22 @@ export function inboxRows(campaign: CampaignState): InboxRow[] {
   })
 }
 
+/**
+ * DECISIONS D12: once every built case is complete, say plainly which tiers are not built yet.
+ * Derived from the catalog, so it never appears while a built ticket is unfinished (P2 audit F1).
+ */
+export function endOfSliceNotice(campaign: CampaignState, catalog: readonly { id: string; tier: 1 | 2 | 3 }[] = TICKETS): string | undefined {
+  if (!catalog.length || !catalog.every((ticket) => campaign.completed.includes(ticket.id))) return undefined
+  const missing = ([1, 2, 3] as const).filter((tier) => !catalog.some((ticket) => ticket.tier === tier))
+  if (!missing.length) return undefined
+  const names = missing.map((tier) => `Tier ${tier}`).join(' and ')
+  return `You have completed every case built so far. ${names} ${missing.length > 1 ? 'are' : 'is'} not built yet in this version. You can replay any case with new details.`
+}
+
 /** DESIGN s4 Inbox. Queued cases open as read-only previews. */
 export default function Inbox({ campaign }: { campaign: CampaignState }) {
   const rows = inboxRows(campaign)
+  const notice = endOfSliceNotice(campaign)
   return <article className="inbox" aria-labelledby="inbox-title">
     <p className="meta"><span className="case-chip">corp.contoso.local · simulated</span></p>
     <h1 id="inbox-title">Inbox</h1>
@@ -34,7 +47,7 @@ export default function Inbox({ campaign }: { campaign: CampaignState }) {
         {row.status === 'Done' && !campaign.active && <button type="button" onClick={() => actions.startVariation(row.id, row.seed)}>Try again, new details</button>}
       </li>)}
     </ul>
-    {!rows.some((row) => row.status !== 'Done') && <p className="muted">No open tickets. More arrive as the shift progresses.</p>}
+    {notice ? <p className="slot" role="status">{notice}</p> : !rows.some((row) => row.status !== 'Done') && <p className="muted">No open tickets. More arrive as the shift progresses.</p>}
     <CheatSheet entries={cheatSheetFor(campaign)} />
   </article>
 }

@@ -15,4 +15,10 @@ describe('ticket scoring', () => {
     expect(rankFor([catalog[0]!, catalog[2]!], catalog)).toBe('Helpdesk')
     expect(rankFor(catalog.slice(0, 2), catalog)).toBe('IAM Analyst')
   })
+  it('D3: completing Tier 1 promotes even when no Tier 2 case is built yet; an empty tier never counts as done', () => {
+    const tier1 = [{ id: 'a', tier: 1 as const, seeds: [1, 2], build: () => { throw new Error() } }, { id: 'b', tier: 1 as const, seeds: [1, 2], build: () => { throw new Error() } }]
+    expect(rankFor([tier1[0]!], tier1)).toBe('Helpdesk')
+    expect(rankFor(tier1, tier1)).toBe('IAM Analyst')
+    expect(rankFor([], [])).toBe('Helpdesk')
+  })
 })

@@ -19,7 +19,19 @@ describe('case 05: contractor offboarding', () => {
         expect(status(result, 'primaryGroup')).toBe('met')
         expect(status(result, 'history')).toBe('met')
         expect(status(result, 'control')).toBe('met')
-        expect(result.state.events.some((event) => event.eventId === 4625 && event.host === 'DC01.corp.contoso.local' && event.target === fixture.ids.target)).toBe(true)
+        expect(result.state.events.some((event) => event.eventId === 4625 && event.host === 'PHARM-WS01.corp.contoso.local' && event.target === fixture.ids.target)).toBe(true)
+      })
+
+      it('D2: test sign-in runs at the assigned workstation and 4625 is recorded there, not on DC01', () => {
+        const fixture = case05.build(seed)
+        const result = runScriptRoute(fixture, undefined, undefined, seed)
+        const failed = result.state.events.filter((event) => event.eventId === 4625 && event.target === fixture.ids.target)
+        expect(result.state.objects[fixture.ids.workstation]?.rdn).toBe('PHARM-WS01')
+        expect(failed.length).toBeGreaterThan(0)
+        expect(failed.every((event) => event.host === 'PHARM-WS01.corp.contoso.local')).toBe(true)
+        expect(fixture.request.evidence.join(' ')).toContain('PHARM-WS01')
+        expect(fixture.hints[2].content).toContain('-ComputerName PHARM-WS01')
+        expect(fixture.predicates.find((item) => item.id === 'failedSignInEvent')?.label).toContain('PHARM-WS01')
       })
 
       it('Directory route uses actual tree, properties, menus, and confirmation labels', () => {

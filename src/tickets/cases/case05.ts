@@ -2,13 +2,13 @@ import { dispatch } from '../../engine/dispatch'
 import type { Action } from '../../engine/types'
 import { findBySamAccountName } from '../../domain/indexes'
 import { deriveDn } from '../../domain/dn'
+import { hostNameOf } from '../../engine/handlers/common'
 import type { DomainState, Guid } from '../../domain/types'
 import { buildBaseDomain, OPERATOR_ID } from '../../fixtures/baseDomain'
 import { attrEquals, freshSignInResult } from '../predicates'
 import type { Attempt, CaseFixture, Debrief, Hint, Predicate, ScriptStep, TicketDef } from '../types'
 
 export const CASE05_ID = 'case05'
-const RECORDING_HOST = 'DC01.corp.contoso.local'
 const FAILED_SIGN_IN = 4625
 
 const VARIANTS = {
@@ -26,7 +26,7 @@ function buildCase05(seed: number): CaseFixture {
     control: '' as Guid,
     approvedGroup: base.ids['group.pharmacyStaff']!,
     unapprovedGroup: base.ids['group.pharmacyManagers']!,
-    workstation: base.ids['computer.dc01']!,
+    workstation: base.ids['computer.pharmWs01']!, // the contractor's assigned workstation (D2)
   }
   const create = (person: { given: string; sn: string; sam: string }): Action => ({
     type: 'user.create', name: `${person.given} ${person.sn}`, samAccountName: person.sam,
@@ -60,6 +60,9 @@ function buildCase05(seed: number): CaseFixture {
   const sam = variant.target.sam
   const controlSam = variant.control.sam
   const targetPath = ['Directory', 'Pharmacy', targetName]
+  // D2: Windows records 4625 on the computer where the sign-in was attempted, not on a domain controller.
+  const workstationName = String(setup.objects[ids.workstation]!.rdn)
+  const RECORDING_HOST = hostNameOf(setup.objects[ids.workstation]!)
   const checklistSignIn = `Test ${variant.target.given}'s sign-in · simulated`
   const disable = `Disable-ADAccount -Identity ${sam}`
   const remove = `Remove-ADGroupMember -Identity ${groupName} -Members ${sam} -Confirm:$false`
@@ -68,7 +71,7 @@ function buildCase05(seed: number): CaseFixture {
     { code: `Get-ADUser -Identity ${sam} -Properties Enabled,primaryGroupID | Select-Object SamAccountName,Enabled,primaryGroupID`, explain: 'Confirm the exact account and note its primary group before making changes.' },
     { code: remove, explain: `Remove only the approved ${groupName} access. -Confirm:$false answers the simulated confirmation prompt.` },
     { code: disable, explain: 'Disable the contractor account so a new simulated sign-in is denied.' },
-    { code: `Test-SimSignIn -Identity ${sam} -ComputerName DC01`, explain: `Attempt a new simulated sign-in. Expected: denied and recorded as event 4625 on ${RECORDING_HOST}.` },
+    { code: `Test-SimSignIn -Identity ${sam} -ComputerName ${workstationName}`, explain: `Attempt a new simulated sign-in at the contractor's assigned workstation. Expected: denied and recorded as event 4625 in that workstation's Security log (${RECORDING_HOST}).` },
     { code: `Get-ADUser -Identity ${sam} -Properties Enabled,primaryGroupID | Select-Object SamAccountName,Enabled,primaryGroupID`, explain: 'Verify the account is disabled and its primary group is unchanged.' },
   ]
   const gui = [
@@ -175,11 +178,11 @@ function buildCase05(seed: number): CaseFixture {
         { term: 'Contractor offboarding', definition: 'Removing approved access and disabling an account when a vendor engagement ends.' },
         { term: 'Primary group', definition: 'The account’s built-in primary group setting. It is separate from ordinary group membership rows.' },
         { term: 'Audit history', definition: 'The retained record of simulated changes and sign-in events.' },
-        { term: 'Event 4625', definition: 'A Windows security event for a failed sign-in.' },
+        { term: 'Event 4625', definition: 'A Windows security event for a failed sign-in, recorded on the computer where the sign-in was attempted.' },
         { term: 'Confirmation', definition: 'A simulated prompt that asks before a group membership is removed.' },
       ],
       needs: `${targetName}'s account must no longer sign in or retain the approved Pharmacy role access after ${variant.endDate}.`,
-      evidence: [`Vendor record ${variant.record}: ${sam} engagement ends ${variant.endDate}.`, `Approved-for-removal list from the record: ${groupName}.`, `Similar-name check: ${controlName} (${controlSam}) is a separate active contractor.`],
+      evidence: [`Vendor record ${variant.record}: ${sam} engagement ends ${variant.endDate}.`, `Assigned workstation: ${workstationName}.`, `Approved-for-removal list from the record: ${groupName}.`, `Similar-name check: ${controlName} (${controlSam}) is a separate active contractor.`],
     },
     responsibility: { account: sam, outcome: `Disable ${sam}, remove approved ${groupName} access, deny a new sign-in, and retain the account, primary group, history, and control contractor.` },
     predicates, hints, routes: { script, gui },
