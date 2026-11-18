@@ -197,3 +197,10 @@ These behaviors differ from Windows PowerShell on purpose.
 
 - Case 02 models an approval for read access by adding the named user to `GG-Finance-Staff`. The existing Finance session retains its sign-in-time membership snapshot; a simulated fresh sign-in uses current group membership.
 - The Finance access check grades the access trace `via` value. Direct user entries and the broader `GG-Finance-Managers` role do not satisfy the approved role-path criterion.
+
+### T08 case 03
+
+- Case 03 grades the new account by its approved sign-in name, because its GUID exists only after the learner creates it. "Exactly one account" counts user objects created since the case checkpoint.
+- The lab has no `Remove-ADUser` in this slice. A learner who creates a second account cannot delete it and must use `Reset-SimAttempt` to start the case again.
+- The GUI New user form has no change-at-next-sign-in box, and it uses the full name as both the name (CN) and the display name. The GUI route sets the flag afterwards on the Account tab.
+- When the initial password fails policy, `New-ADUser` still creates the account, turned off and with no credential, and reports an error. The learner recovers with `Set-ADAccountPassword -Reset` and `Enable-ADAccount` on the same account.

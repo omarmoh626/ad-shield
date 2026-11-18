@@ -51,6 +51,19 @@ describe('case 02: approved Finance share read access', () => {
         expect(result.predicates.find((predicate) => predicate.id === 'noDirectGrant')?.observed).toContain('direct user entry present')
       })
 
+      it('D8: a direct write grant beside the approved role fails the direct-grant check', () => {
+        const fixture = case02.build(seed)
+        const result = runScriptRoute(fixture, [
+          ...fixture.routes.script,
+          { code: `Add-SimResourcePermission -Resource Finance -Identity ${fixture.request.who.account} -Right Write`, explain: 'Adds a direct write entry beside the role grant.' },
+        ], undefined, seed)
+        expect(result.closed).toBe(false)
+        const check = result.predicates.find((predicate) => predicate.id === 'noDirectGrant')
+        expect(check?.status).toBe('unmet')
+        expect(check?.observed).toContain('allow write')
+        expect(fixture.debrief(result).access).toContain('direct user entry is present')
+      })
+
       it('detects direct read entry even when approved role entry is also present', () => {
         const fixture = case02.build(seed)
         const steps = [

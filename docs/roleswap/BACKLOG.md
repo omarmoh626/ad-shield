@@ -42,4 +42,5 @@ Omar added these on 2026-11-17, during T07. Do them after T10, before Tier 2.
 - **Bug: Progress panel.** The Progress panel pushes the page down. Make it a popover under the button that closes on Esc or an outside click.
 - **Bug: checklist detail text.** The detail text shows internals ("sequence 14"). Use plain words.
 - **Ticket chip.** The chip shows `case01`. Use ticket numbers such as `INC-01`.
+- **Remove-ADUser.** Add `Remove-ADUser` (with `-WhatIf` and confirmation) and a matching `user.delete` action. Case 03 tells a learner who created a duplicate account to use Reset this attempt until then; update that text and `docs/SUPPORT.md` when this ships. Added by Omar on 2026-11-17, during T08.
 - **Testing.** Omar plays every case by hand. Three AI testers run every case and report bugs and confusing spots.

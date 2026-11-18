@@ -61,7 +61,17 @@ describe('case 02 access predicates', () => {
     const withDirectRead = { ...roleState, aces: [...roleState.aces, ...(['share', 'file'] as const).map((layer) => ({ resourceId: 'share.pharmacy', trustee: control, right: 'read', effect: 'allow' as const, inherited: false, layer }))] }
     const predicate = noDirectAccessEntry('no-direct', 'No direct entry', control, 'share.pharmacy', 'read')
     expect(predicate.evaluate(roleState, attempt(roleState)).status).toBe('met')
-    expect(predicate.evaluate(withDirectRead, attempt(withDirectRead))).toMatchObject({ status: 'unmet', observed: 'direct user entry present on share layer (allow read)' })
+    expect(predicate.evaluate(withDirectRead, attempt(withDirectRead))).toMatchObject({ status: 'unmet', observed: expect.stringContaining('share layer (allow read)') })
+  })
+
+  it('D8: with any right, a direct write entry fails even when the user is denied read', () => {
+    const control = base.ids['user.aokoye']
+    const state = base.state
+    const withDirectWrite = { ...state, aces: [...state.aces, { resourceId: 'share.pharmacy', trustee: control, right: 'write', effect: 'allow' as const, inherited: false, layer: 'share' as const }] }
+    const any = noDirectAccessEntry('no-direct', 'No direct entry', control, 'share.pharmacy', 'any')
+    expect(any.evaluate(state, attempt(state)).status).toBe('met')
+    expect(any.evaluate(withDirectWrite, attempt(withDirectWrite))).toMatchObject({ status: 'unmet', observed: expect.stringContaining('share layer (allow write)') })
+    expect(noDirectAccessEntry('no-direct', 'No direct entry', control, 'share.pharmacy').evaluate(withDirectWrite, attempt(withDirectWrite)).status).toBe('unmet')
   })
 
   it('grades an already-issued session from its captured context', () => {
@@ -71,5 +81,49 @@ describe('case 02 access predicates', () => {
     const withSession = { ...state, sessions: [{ id: 'sess-case-test', context }] }
     expect(sessionAccessVia('old', 'Old session denied', 'sess-case-test', 'share.pharmacy', 'read', false, 'none').evaluate(withSession, attempt(withSession))).toMatchObject({ status: 'met', observed: 'denied via none' })
     expect(sessionAccessVia('missing', 'Missing', 'missing', 'share.pharmacy', 'read', false, 'none').evaluate(state, attempt(state)).status).toBe('unmet')
+  })
+})
+
+import { accountCheck, exactlyOneNewAccount, objectMatchesBaseline } from '../../src/tickets/predicates'
+import { dispatch } from '../../src/engine/dispatch'
+import type { Action } from '../../src/engine/types'
+
+describe('case 03 account predicates', () => {
+  const operator = base.ids['user.operator']!
+  const create = (state: DomainState, sam: string): DomainState => {
+    const action: Action = { type: 'user.create', name: `Test ${sam}`, samAccountName: sam, parent: base.ids['ou.nursing'], enabled: true, credential: { policy: 'pass' } }
+    const out = dispatch(state, action, { actor: operator, source: 'console', whatIf: false })
+    if (!out.ok) throw new Error(out.message ?? String(out.error))
+    return out.state
+  }
+
+  it('exactlyOneNewAccount counts user objects created since the checkpoint', () => {
+    const one = create(base.state, 'tnew')
+    const predicate = exactlyOneNewAccount('one', 'One account', 'TNEW')
+    expect(predicate.evaluate(base.state, attempt(base.state))).toMatchObject({ status: 'unmet', observed: 'no new account' })
+    expect(predicate.evaluate(one, { ...attempt(base.state), state: one })).toMatchObject({ status: 'met', observed: '1 new account: tnew' })
+    const two = create(one, 'tnew2')
+    expect(predicate.evaluate(two, { ...attempt(base.state), state: two })).toMatchObject({ status: 'unmet', observed: '2 new accounts: tnew, tnew2' })
+    expect(exactlyOneNewAccount('one', 'One account', 'other').evaluate(one, attempt(base.state)).status).toBe('unmet')
+  })
+
+  it('accountCheck finds the account by sign-in name and reports a missing account', () => {
+    const one = create(base.state, 'tnew')
+    const enabled = accountCheck('enabled', 'Enabled', 'tnew', 'enabled', (account) => [account.attrs.enabled === true, String(account.attrs.enabled)])
+    expect(enabled.evaluate(one, attempt(one))).toMatchObject({ status: 'met', observed: 'true', required: 'enabled' })
+    expect(enabled.evaluate(base.state, attempt(base.state))).toMatchObject({ status: 'unmet', observed: 'no account named tnew' })
+    expect(accountCheck('c', 'C', 'tnew', 'x', () => [true, 'ok'], 'control').kind).toBe('control')
+  })
+
+  it('objectMatchesBaseline lists each changed attribute, name, container, and group', () => {
+    const predicate = objectMatchesBaseline('namesake', 'Namesake unchanged', user)
+    expect(predicate.evaluate(base.state, attempt(base.state))).toMatchObject({ status: 'met', observed: 'matches baseline' })
+    const edited = dispatch(base.state, { type: 'user.setAttrs', target: user, attrs: { displayName: 'Priya Nair (old)', title: 'Lead' } }, { actor: operator, source: 'console', whatIf: false }).state
+    const out = predicate.evaluate(edited, { ...attempt(base.state), state: edited })
+    expect(out.status).toBe('unmet')
+    expect(out.observed).toContain("displayName 'Priya Nair' → 'Priya Nair (old)'")
+    expect(out.observed).toContain('title')
+    const grouped = dispatch(base.state, { type: 'group.addMember', group: base.ids['group.financeStaff']!, member: user }, { actor: operator, source: 'console', whatIf: false }).state
+    expect(predicate.evaluate(grouped, { ...attempt(base.state), state: grouped }).observed).toContain('groups')
   })
 })

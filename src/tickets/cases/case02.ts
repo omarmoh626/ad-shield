@@ -5,7 +5,7 @@ import type { DomainState, Guid } from '../../domain/types'
 import { buildBaseDomain, OPERATOR_ID } from '../../fixtures/baseDomain'
 import { buildContext } from '../../access/token'
 import { evaluateAccess } from '../../access/trace'
-import { effectiveAccessVia, memberOf, noDirectAccessEntry, notMemberOf, sessionAccessVia } from '../predicates'
+import { directUserEntries, effectiveAccessVia, memberOf, noDirectAccessEntry, notMemberOf, sessionAccessVia } from '../predicates'
 import type { Attempt, CaseFixture, Debrief, Hint, Predicate, ScriptStep, TicketDef } from '../types'
 
 export const CASE02_ID = 'case02'
@@ -58,7 +58,7 @@ function buildCase02(seed: number): CaseFixture {
     { ...sessionAccessVia('existingSession', 'Existing session keeps its old group snapshot', sessionId, 'share.finance', 'read', false, 'none'), kind: 'evidence', posture: 'security' },
     { ...notMemberOf('notWriteRole', 'User is not in the broader Finance manager role', ids.user, ids.writeRole), posture: 'security' },
     { ...effectiveAccessVia('controlDenied', 'Control user remains denied Finance read access', ids.control, 'share.finance', 'read', false, 'none'), posture: 'security' },
-    { ...noDirectAccessEntry('noDirectGrant', 'No applying direct user entry grants Finance access', ids.user, 'share.finance', 'read'), posture: 'security' },
+    { ...noDirectAccessEntry('noDirectGrant', 'No applying direct user entry grants Finance access', ids.user, 'share.finance', 'any'), posture: 'security' },
   ]
   const hints: [Hint, Hint, Hint] = [
     { level: 1, content: `The approval names ${personName}, Finance, and read. What role group should connect ${variant.sam} to the resource permission? Check both access and the existing session.` },
@@ -70,7 +70,7 @@ function buildCase02(seed: number): CaseFixture {
     const checked = attempt.state.events.some((event) => event.eventId === 4624 && event.target === ids.user)
     const readTrace = evaluateAccess(attempt.state, buildContext(attempt.state, ids.user), 'share.finance', 'read')
     const writeTrace = evaluateAccess(attempt.state, buildContext(attempt.state, ids.user), 'share.finance', 'write')
-    const directEntry = readTrace.layers.flatMap((layer) => layer.entries).find((entry) => entry.applies && entry.trustee === ids.user)
+    const directEntry = directUserEntries(attempt.state, ids.user, 'share.finance')[0]
     const inWriteRole = attempt.state.memberships.some((membership) => membership.member === ids.user && membership.group === ids.writeRole)
     const allowed = (value: boolean) => value ? 'allowed' : 'denied'
     return {
