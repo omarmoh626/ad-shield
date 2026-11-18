@@ -192,3 +192,8 @@ These behaviors differ from Windows PowerShell on purpose.
 - The save also holds the remaining SLA countdown (D4). It is saved every 10 seconds while the countdown runs, on pause, and on every committed action, so a reload can lose up to 10 seconds of countdown. A save from before this field existed loads with the active case's full SLA.
 - A fresh variation of a completed case is saved with a replay flag (D8). After a reload it is still a replay and cannot award a second completion.
 - When storage is full or blocked, the simulator shows a notice and keeps working. It shows "Not saved" until a later save succeeds.
+
+### T08 case 02
+
+- Case 02 models an approval for read access by adding the named user to `GG-Finance-Staff`. The existing Finance session retains its sign-in-time membership snapshot; a simulated fresh sign-in uses current group membership.
+- The Finance access check grades the access trace `via` value. Direct user entries and the broader `GG-Finance-Managers` role do not satisfy the approved role-path criterion.

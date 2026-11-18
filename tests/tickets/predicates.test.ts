@@ -40,3 +40,36 @@ describe('ticket predicates', () => {
     expect(predicate.evaluate({ ...state, now: state.now + 5000 }, a).status).toBe('met')
   })
 })
+
+import { effectiveAccessVia, noDirectAccessEntry, sessionAccessVia } from '../../src/tickets/predicates'
+import { buildContext } from '../../src/access/token'
+
+describe('case 02 access predicates', () => {
+  it('grades the access trace via field and rejects a direct user grant', () => {
+    const state = base.state
+    const a = attempt(state)
+    expect(effectiveAccessVia('role', 'Role path', user, 'share.pharmacy', 'read', true, 'role').evaluate(state, a)).toMatchObject({ status: 'met', observed: 'allowed via role' })
+    const control = base.ids['user.aokoye']
+    const directState: DomainState = { ...state, aces: [...state.aces, ...(['share', 'file'] as const).map((layer) => ({ resourceId: 'share.pharmacy', trustee: control, right: 'read', effect: 'allow' as const, inherited: false, layer }))] }
+    expect(effectiveAccessVia('role', 'Role path only', control, 'share.pharmacy', 'read', true, 'role').evaluate(directState, attempt(directState))).toMatchObject({ status: 'unmet', observed: 'allowed via direct' })
+  })
+
+  it('detects every applying direct user ACE when a role ACE also grants access', () => {
+    const control = base.ids['user.aokoye']
+    const state = base.state
+    const roleState: DomainState = { ...state, memberships: [...state.memberships, { group: base.ids['group.pharmacyStaff'], member: control }] }
+    const withDirectRead = { ...roleState, aces: [...roleState.aces, ...(['share', 'file'] as const).map((layer) => ({ resourceId: 'share.pharmacy', trustee: control, right: 'read', effect: 'allow' as const, inherited: false, layer }))] }
+    const predicate = noDirectAccessEntry('no-direct', 'No direct entry', control, 'share.pharmacy', 'read')
+    expect(predicate.evaluate(roleState, attempt(roleState)).status).toBe('met')
+    expect(predicate.evaluate(withDirectRead, attempt(withDirectRead))).toMatchObject({ status: 'unmet', observed: 'direct user entry present on share layer (allow read)' })
+  })
+
+  it('grades an already-issued session from its captured context', () => {
+    const state = base.state
+    const control = base.ids['user.aokoye']
+    const context = buildContext(state, control)
+    const withSession = { ...state, sessions: [{ id: 'sess-case-test', context }] }
+    expect(sessionAccessVia('old', 'Old session denied', 'sess-case-test', 'share.pharmacy', 'read', false, 'none').evaluate(withSession, attempt(withSession))).toMatchObject({ status: 'met', observed: 'denied via none' })
+    expect(sessionAccessVia('missing', 'Missing', 'missing', 'share.pharmacy', 'read', false, 'none').evaluate(state, attempt(state)).status).toBe('unmet')
+  })
+})
