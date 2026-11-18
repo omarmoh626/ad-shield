@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:perf": "vite build --config vite.perf.config.ts",
+    "preview": "vite preview",
+    "e2e": "playwright test",
+    "perf": "AD_SHIELD_PERF=1 playwright test e2e/perf.spec.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "guard": "node scripts/guard.mjs"
@@ -17,6 +21,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

@@ -237,6 +237,11 @@ export function useStore<T>(selector: (value: UiState) => T): T {
   return useSyncExternalStore((listener) => { listeners.add(listener); return () => listeners.delete(listener) }, () => selector(state), () => selector(state))
 }
 export const getStore = () => state
+/** Seeds the isolated performance build with a prepared campaign; normal app startup never calls this. */
+export function seedPerformanceCampaign(value: CampaignState) {
+  const sla = slaFrom(value)
+  publish({ ...state, campaign: value, screen: 'Work', tab: 'Evidence', sla, forms: {}, closeRefusal: undefined })
+}
 /** Test helper: a fresh case 01 attempt on the Work screen. */
 export function resetStore() {
   campaign = introduceTicket(createCampaign(base.state, ['case01']), case01, 1)
