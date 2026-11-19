@@ -21,23 +21,48 @@ const Terminal = forwardRef<TerminalHandle>(function Terminal(_props, ref) {
   const history = useRef<string[]>([])
   const answers = useRef<({ kind: 'secure'; policy: 'pass' | 'fail' } | { kind: 'confirm'; value: boolean })[]>([])
   const fixture = campaign.active ? getTicket(campaign.active.id)?.build(campaign.active.seed) : undefined
+  // D9 (T10 K1): one console session per case attempt, so variables such as $pw from
+  // Read-Host -AsSecureString survive from one typed line to the next, as in PowerShell.
+  // The session lives in memory only: a reload, a new case or variant, or a reset starts a new one.
+  // A secure string holds the policy verdict only, never the typed characters (docs/SUPPORT.md).
+  const fixtureRef = useRef(fixture)
+  fixtureRef.current = fixture
+  const takeRef = useRef<(kind: 'secure' | 'confirm') => (typeof answers.current)[number] | undefined>(() => undefined)
+  const session = useRef<{ key: string; rt: ReturnType<typeof createRuntime> } | undefined>(undefined)
+  const seen = useRef<{ key: string; state: unknown; history: number } | undefined>(undefined)
+  const attemptKey = (attempt: NonNullable<typeof campaign.active>) => `${attempt.id}:${attempt.seed}:${attempt.replay ? 'replay' : 'live'}`
+  // A reset (the Reset this attempt button or Reset-SimAttempt) replaces the state with a copy of the
+  // checkpoint and empties the history. Every committed change adds history, so this pattern means a reset.
+  useEffect(() => {
+    const attempt = campaign.active
+    const now = attempt ? { key: attemptKey(attempt), state: attempt.state, history: attempt.history.length } : undefined
+    const before = seen.current
+    if (!now || !before || before.key !== now.key || (now.history === 0 && now.state !== before.state)) session.current = undefined
+    seen.current = now
+  }, [campaign.active])
+  function sessionFor(key: string) {
+    if (session.current?.key === key) return session.current.rt
+    const rt = createRuntime({ registry, actor: operatorGuid,
+      readSecure: () => { const answer = takeRef.current('secure'); return answer?.kind === 'secure' ? { policy: answer.policy } : undefined },
+      confirm: () => { const answer = takeRef.current('confirm'); return answer?.kind === 'confirm' ? answer.value : undefined },
+      tickets: {
+      getCampaign: () => actionsStateCampaign(), setCampaign: actions.setCampaign,
+      getFixture: () => fixtureRef.current,
+    } })
+    session.current = { key, rt }
+    return rt
+  }
   function runSource(source: string) {
     const active = actionsStateCampaign()
     if (!active?.active) return
     let consumed = 0
-    const take = (kind: 'secure' | 'confirm') => {
+    takeRef.current = (kind) => {
       const answer = answers.current[consumed]
       if (!answer || answer.kind !== kind) return undefined
       consumed += 1
       return answer
     }
-    const rt = createRuntime({ registry, actor: operatorGuid,
-      readSecure: () => { const answer = take('secure'); return answer?.kind === 'secure' ? { policy: answer.policy } : undefined },
-      confirm: () => { const answer = take('confirm'); return answer?.kind === 'confirm' ? answer.value : undefined },
-      tickets: {
-      getCampaign: () => actionsStateCampaign(), setCampaign: actions.setCampaign,
-      getFixture: () => fixture,
-    } })
+    const rt = sessionFor(attemptKey(active.active))
     const result = run(source, rt, active.active.state)
     // Replay (CONTRACTS s7): keep every queued answer while the run is pending; clear the queue once it finishes.
     if (!result.pending) answers.current = []

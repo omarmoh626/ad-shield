@@ -211,6 +211,18 @@ describe('persistence', () => {
       expect(locks.holders()).toBe(1)
     })
 
+    it('tells listeners when the read-only notice arrives after the status change (T10 K2)', () => {
+      const store = memoryStorage(), locks = fakeLockManager()
+      const a = tab(store, locks.lock(), 'tab-a'), b = tab(store, locks.lock(), 'tab-b')
+      a.load(); b.load()
+      a.claimWriter(() => undefined)
+      const seen: string[][] = []
+      b.subscribe(() => seen.push(b.notices.map((n) => n.kind)))
+      b.claimWriter(() => undefined)
+      expect(b.status).toBe('readOnly')
+      expect(seen.at(-1)).toEqual(['otherTabWriting'])
+    })
+
     it('the read-only tab never writes, even when it holds the newest known revision', () => {
       const store = memoryStorage(), locks = fakeLockManager()
       const bStore = spy(store)

@@ -7,6 +7,7 @@ import { actions, seedPerformanceCampaign, useStore } from '../ui/store'
 import AuditLog from '../ui/log/AuditLog'
 import Checklist from '../ui/criteria/Checklist'
 import ReadScreen from '../ui/ticket/ReadScreen'
+import { describeEvent } from '../ui/debrief/timeline'
 // @ts-expect-error Vite bundles CSS imports at runtime.
 import './perf.css'
 
@@ -38,10 +39,14 @@ document.addEventListener('input', (event) => {
   const list = root?.querySelector('.log-list')
   if (!root || !list) return
   const started = performance.now()
+  // D7: stop only when the row of the event that matches the query is rendered in the list.
+  const match = largeState.events.find((item) => item.data.marker === input.value.trim())
+  if (!match) return
+  const expected = [describeEvent(match, largeState), match.host ?? '', String(match.eventId ?? '')]
   stopAtRenderedFrame('filter', root, () => {
     const count = root.querySelector('p[aria-live="polite"]')?.textContent ?? ''
-    const row = list.querySelector('[role="listitem"]')?.textContent ?? ''
-    return count.startsWith('1 of 10000 events') && row.length > 0
+    if (!count.startsWith('1 of 10000 events')) return false
+    return [...list.querySelectorAll('[role="listitem"]')].some((row) => expected.every((part) => row.textContent?.includes(part)))
   }, started)
 }, true)
 

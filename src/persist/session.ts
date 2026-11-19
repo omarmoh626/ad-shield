@@ -91,8 +91,10 @@ export class PersistSession {
       blocked: () => {
         waited = true
         this.role = 'waiting'
-        this.setStatus('readOnly')
+        // D9 (T10 K2): add the notice before the status change, so listeners that read the notices
+        // on the status change show the explanation text, not only the "Read only" status.
         this.notice('otherTabWriting', 'The simulator is open in another tab. This tab is read-only and will take over when that tab closes.')
+        this.setStatus('readOnly')
       },
       acquired: () => {
         this.role = 'writer'

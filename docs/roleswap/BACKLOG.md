@@ -30,7 +30,10 @@ Add items here as tasks T01 to T10 defer them: nits from audits, bugs too large 
 
 - **T03 D9, `-ChangePasswordAtLogon`.** Sign-in must honor the `changePasswordAtLogon` attribute that T03 stores instead of `pwdLastSet = 0`. Consider mapping it to `pwdLastSet = 0` in the engine. Scheduled for T04 P2.
 - **Tests in a read-only sandbox (from T04 P2 audit).** Make `npm test` runnable when `node_modules` is read-only, for example with Vite's runner config loader (`--configLoader runner`) so Vitest does not write `node_modules/.vite-temp`. Codex can then run the test checks during reviews.
-- **npm audit recheck (T06 D10).** At the start of every task, run `npm audit`. The 6 high warnings come from one advisory, picomatch GHSA-fc5q-39xc-vjpf (ReDoS, no patched release as of 2026-11-17), pulled in by vite, vitest, tinyglobby, fdir, and @vitejs/plugin-react. Upgrade as soon as a patched picomatch or a vite/vitest release without it ships, without downgrading a major version. Then remove the `--host` warning from `docs/SUPPORT.md`.
+- **npm audit at the start of every task.** Run `npm audit` at the start of every task and record new advisories. (T06 D10 is closed: resolved by advisory withdrawal on 2026-11-18, picomatch still 4.0.7. Closed in T10.)
+- **Fixed in T10 (D9):** console variables now survive between typed lines (one console session per case attempt), and a read-only second tab now shows why it is read-only.
+- **e2e specs are not type-checked (T10).** `tsconfig.json` includes `src` and `tests` only. Playwright transpiles `e2e/` without type checks. Add `e2e` and `playwright.config.ts` to `tsconfig.json`.
+- **Perf timer nit (T10 P1).** Closed in T10 P2 (D7): the audit-log filter timer now stops only when the matching event's row is rendered.
 
 ## Revision phase (after T10)
 
